@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PCR Metabarcoding Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:system-ui,sans-serif;font-size:14px;color:#e0e0e0;background:#1a1a1a;padding:1.5rem;}
+  h1{font-size:18px;font-weight:600;margin-bottom:1.5rem;color:#fff;}
+  .section{background:#242424;border:1px solid #333;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;}
+  .section-title{font-size:11px;font-weight:600;color:#888;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.06em;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:12px;color:#aaa;}
+  input[type=number],input[type=text]{background:#1a1a1a;border:1px solid #444;border-radius:6px;padding:6px 10px;color:#e0e0e0;font-size:13px;width:100%;}
+  input[type=number]:focus,input[type=text]:focus{outline:none;border-color:#378ADD;}
+  input[type=range]{width:100%;accent-color:#378ADD;}
+  .slider-row{display:flex;align-items:center;gap:8px;}
+  .slider-row label{font-size:12px;color:#aaa;min-width:36px;}
+  .slider-row span{font-size:13px;font-weight:600;min-width:36px;text-align:right;color:#e0e0e0;}
+  .pbox{background:#1e1e1e;border-radius:6px;padding:.5rem .75rem;font-size:12px;color:#aaa;margin-top:6px;}
+  .pbox b{color:#e0e0e0;font-weight:600;}
+  .eff-block{border:1px solid #333;border-radius:8px;padding:.6rem .75rem;}
+  .eff-label{font-size:12px;font-weight:600;margin-bottom:6px;}
+  .model-tabs{display:flex;gap:8px;}
+  .tab{padding:7px 20px;border:1px solid #444;border-radius:8px;font-size:13px;cursor:pointer;background:transparent;color:#aaa;transition:all .15s;}
+  .tab:hover{border-color:#888;color:#e0e0e0;}
+  .tab.active{background:#1a3a5c;color:#7ab8f5;border-color:#378ADD;}
+  .calc-btn{margin-top:.75rem;width:100%;padding:9px;font-size:13px;background:#378ADD;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:500;}
+  .calc-btn:hover{background:#2a6ab0;}
+  .chart-outer{position:relative;width:100%;height:360px;}
+  .rel-outer{position:relative;width:100%;height:320px;}
+  .cl{font-size:13px;font-weight:500;color:#aaa;margin-bottom:6px;}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#aaa;margin-top:8px;}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .badge{font-size:11px;padding:2px 8px;border-radius:6px;background:#3a2a00;color:#f0a500;display:inline-block;margin-left:6px;}
+  .hint{font-size:11px;color:#555;margin-top:6px;line-height:1.6;}
+  .venn-wrap{display:grid;grid-template-columns:1fr 40px 1fr 40px 1fr;gap:4px;align-items:end;margin-top:12px;}
+  .venn-sep{font-size:22px;color:#555;text-align:center;padding-bottom:4px;}
+  .stop-box{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.25rem;}
+  .stop-card{border-radius:8px;padding:.75rem 1rem;}
+  .stop-card .label{font-size:11px;font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
+  .stop-card .value{font-size:24px;font-weight:700;line-height:1.1;}
+  .stop-card .sub{font-size:11px;margin-top:4px;opacity:.7;}
+  .stop-a{background:#0d1e30;border:1px solid #1e4a7a;}
+  .stop-a .label,.stop-a .value{color:#378ADD;}
+  .stop-b{background:#0a1f18;border:1px solid #145c3a;}
+  .stop-b .label,.stop-b .value{color:#1D9E75;}
+  .formula-box{background:#1e1e1e;border-radius:6px;padding:.75rem 1rem;font-size:12px;line-height:1.7;color:#bbb;}
+  .formula-box code{background:#0e0e0e;padding:1px 6px;border-radius:4px;font-family:ui-monospace,monospace;font-size:12px;color:#e0e0e0;}
+  .formula-box .frow{margin-bottom:4px;}
+  .tbl-wrap{max-height:340px;overflow-y:auto;border:1px solid #333;border-radius:6px;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  th,td{padding:5px 8px;text-align:right;border-bottom:1px solid #2a2a2a;}
+  th{position:sticky;top:0;background:#1e1e1e;font-weight:600;color:#888;}
+  td:first-child,th:first-child{text-align:center;}
+  tr.stopA-row{background:rgba(55,138,221,0.12);}
+  tr.stopB-row{background:rgba(29,158,117,0.12);}
+  .dl-btn{margin-top:.75rem;padding:7px 14px;font-size:12px;background:transparent;border:1px solid #444;color:#aaa;border-radius:6px;cursor:pointer;}
+  .dl-btn:hover{border-color:#888;color:#e0e0e0;}
+</style>
+</head>
+<body>
+<h1>PCR Metabarcoding Simulator</h1>
+
+<div class="section">
+  <div class="section-title">Assay Setup</div>
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="field"><label>Template A — N0 (molecules)</label><input type="number" id="n0a" value="50000" min="1"></div>
+    <div class="field"><label>Template B — N0 (molecules)</label><input type="number" id="n0b" value="50000" min="1"></div>
+  </div>
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="eff-block"><div class="eff-label" style="color:#7ab8f5">Template A — Amplification Efficiency</div>
+      <div class="slider-row"><label>E_A</label><input type="range" id="effA" min="0.01" max="1" step="0.01" value="0.9"><span id="effAVal">0.90</span></div></div>
+    <div class="eff-block"><div class="eff-label" style="color:#5ec49a">Template B — Amplification Efficiency</div>
+      <div class="slider-row"><label>E_B</label><input type="range" id="effB" min="0.01" max="1" step="0.01" value="0.6"><span id="effBVal">0.60</span></div></div>
+  </div>
+  <div class="grid3">
+    <div class="field"><label>Total Primer Mix [nM]</label><input type="number" id="primerConc" value="200" min="1"></div>
+    <div class="field"><label>Volume [µL]</label><input type="number" id="assayVol" value="10" min="1"></div>
+    <div class="field"><label>Cycles</label><input type="number" id="cycles" value="35" min="5" max="60"></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Forward Primer &amp; Variants</div>
+  <div class="field" style="margin-bottom:8px">
+    <label>Primer Sequence (IUPAC: R=AG, Y=CT, W=AT, S=CG, K=GT, M=AC, B=CGT, D=AGT, H=ACT, V=ACG, N=ACGT)</label>
+    <input type="text" id="primerSeq" value="GGDACWGGWTGAACWGTWTAYCCHCC">
+  </div>
+  <div class="pbox" id="primerInfo">-</div>
+  <div class="venn-wrap">
+    <div class="field"><label style="color:#7ab8f5;font-weight:600;">Variants A (all that bind A)</label><input type="number" id="varA" value="288" min="0"></div>
+    <div class="venn-sep">&#8745;</div>
+    <div class="field"><label style="font-weight:600;">Overlap A&#8745;B</label><input type="number" id="varAB" value="144" min="0"></div>
+    <div class="venn-sep">&#8745;</div>
+    <div class="field"><label style="color:#5ec49a;font-weight:600;">Variants B (all that bind B)</label><input type="number" id="varB" value="144" min="0"></div>
+  </div>
+  <div class="pbox" id="varInfo" style="margin-top:8px">-</div>
+  <div class="hint">Each copy binds one of its variants at random. A splits its demand across exclusive + overlap variants. Within the overlap, A and B compete in proportion to copy number. Once the overlap is exhausted, B stops, while A continues using its exclusive variants.</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Model</div>
+  <div class="model-tabs">
+    <button class="tab active" id="tabShelton">Shelton et al. &nbsp;&middot;&nbsp; N0 &middot; (1+E)^c</button>
+    <button class="tab" id="tabNew">New Model &nbsp;&middot;&nbsp; N0 &middot; E &middot; (2^c - c - 1)</button>
+  </div>
+  <button class="calc-btn" id="calcBtn">Calculate &amp; Plot</button>
+</div>
+
+<div class="section">
+  <div class="section-title">Calculation Used</div>
+  <div class="formula-box" id="formulaBox">-</div>
+</div>
+
+<div class="section">
+  <div class="cl">Amplification Stop (Primer Exhausted)</div>
+  <div class="stop-box">
+    <div class="stop-card stop-a"><div class="label">Template A</div><div class="value" id="stopA">-</div><div class="sub" id="stopAsub">-</div></div>
+    <div class="stop-card stop-b"><div class="label">Template B</div><div class="value" id="stopB">-</div><div class="sub" id="stopBsub">-</div></div>
+  </div>
+  <div class="cl">Absolute Copies vs. Cycles</div>
+  <div class="chart-outer"><canvas id="absCanvas"></canvas></div>
+  <div class="legend" id="absLegend"></div>
+  <div class="cl" style="margin-top:1.75rem">Relative Reads vs. Cycles</div>
+  <div class="rel-outer"><canvas id="relCanvas"></canvas></div>
+  <div class="legend" id="relLegend"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Results Table</div>
+  <div class="tbl-wrap">
+    <table id="resultTable">
+      <thead><tr><th>Cycle</th><th>Copies A</th><th>Gain A</th><th>Copies B</th><th>Gain B</th><th>Proportion A</th><th>Proportion B</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+  </div>
+  <button class="dl-btn" id="csvBtn">Download Table as CSV</button>
+</div>
+
+<script>
+const IUPAC={A:1,C:1,G:1,T:1,U:1,R:2,Y:2,S:2,W:2,K:2,M:2,B:3,D:3,H:3,V:3,N:4};
+function calcVar(seq){return seq.toUpperCase().split('').reduce((a,c)=>a*(IUPAC[c]||1),1);}
+function updatePrimerInfo(){
+  const seq=document.getElementById('primerSeq').value, v=calcVar(seq);
+  const deg=seq.toUpperCase().split('').filter(c=>IUPAC[c]>1).length;
+  document.getElementById('primerInfo').innerHTML='Length: <b>'+seq.length+' bp</b> &nbsp;|&nbsp; Degenerate Positions: <b>'+deg+'</b> &nbsp;|&nbsp; Variants: <b>'+v.toLocaleString()+'</b>';
+  updateVarInfo();
+}
+function updateVarInfo(){
+  const vA=+document.getElementById('varA').value||0, vB=+document.getElementById('varB').value||0, vAB=+document.getElementById('varAB').value||0;
+  const pool=vA+vB-vAB, comp=calcVar(document.getElementById('primerSeq').value);
+  let w='';
+  if(vAB>vA) w+='<span class="badge">! Overlap > Variants A</span>';
+  if(vAB>vB) w+='<span class="badge">! Overlap > Variants B</span>';
+  if(pool!==comp) w+='<span class="badge">! Total pool '+pool+' != '+comp.toLocaleString()+' (calculated)</span>';
+  document.getElementById('varInfo').innerHTML='Exclusive A: <b>'+(vA-vAB)+'</b> &nbsp;|&nbsp; Overlap: <b>'+vAB+'</b> &nbsp;|&nbsp; Exclusive B: <b>'+(vB-vAB)+'</b> &nbsp;|&nbsp; Total pool: <b>'+pool+'</b>'+w;
+}
+document.getElementById('primerSeq').addEventListener('input',updatePrimerInfo);
+['varA','varB','varAB'].forEach(id=>document.getElementById(id).addEventListener('input',updateVarInfo));
+document.getElementById('effA').addEventListener('input',function(){document.getElementById('effAVal').textContent=parseFloat(this.value).toFixed(2);});
+document.getElementById('effB').addEventListener('input',function(){document.getElementById('effBVal').textContent=parseFloat(this.value).toFixed(2);});
+updatePrimerInfo();
+
+let activeModel='shelton';
+document.getElementById('tabShelton').addEventListener('click',function(){activeModel='shelton';this.classList.add('active');document.getElementById('tabNew').classList.remove('active');});
+document.getElementById('tabNew').addEventListener('click',function(){activeModel='new';this.classList.add('active');document.getElementById('tabShelton').classList.remove('active');});
+
+function nmol2mol(nM,ul){return nM*1e-9*(ul*1e-6)*6.022e23;}
+function idealGain(model,N0,E,copies,c){
+  if(model==='shelton') return copies*E;
+  return Math.max(0, N0*E*(Math.pow(2,c-1)-1));
+}
+function simulate(N0A,EA,N0B,EB,mpp,nVarA,nVarB,nVarAB,cycs,model){
+  const exclA=Math.max(0,nVarA-nVarAB), exclB=Math.max(0,nVarB-nVarAB);
+  const budgetExclA=mpp*exclA, budgetExclB=mpp*exclB, budgetOverlap=mpp*nVarAB;
+  const fExclA=nVarA>0?exclA/nVarA:0, fOvA=nVarA>0?nVarAB/nVarA:0;
+  const fExclB=nVarB>0?exclB/nVarB:0, fOvB=nVarB>0?nVarAB/nVarB:0;
+  let copiesA=N0A,copiesB=N0B, usedExclA=0,usedExclB=0,usedOverlap=0;
+  const arrA=[N0A],arrB=[N0B],gA=[0],gB=[0];
+  let stopA=null,stopB=null;
+  for(let c=1;c<=cycs;c++){
+    const demandA=idealGain(model,N0A,EA,copiesA,c);
+    const demandB=idealGain(model,N0B,EB,copiesB,c);
+    const demExclA=demandA*fExclA, demOvA=demandA*fOvA;
+    const demExclB=demandB*fExclB, demOvB=demandB*fOvB;
+    const getExclA=Math.min(demExclA,budgetExclA-usedExclA);
+    const getExclB=Math.min(demExclB,budgetExclB-usedExclB);
+    const availOv=budgetOverlap-usedOverlap, totOvDem=demOvA+demOvB;
+    let getOvA=0,getOvB=0;
+    if(totOvDem>0&&availOv>0){const give=Math.min(totOvDem,availOv);getOvA=give*(demOvA/totOvDem);getOvB=give*(demOvB/totOvDem);}
+    usedExclA+=getExclA; usedExclB+=getExclB; usedOverlap+=getOvA+getOvB;
+    const gainA=getExclA+getOvA, gainB=getExclB+getOvB;
+    if(stopA===null && demandA>=1 && gainA<1) stopA={cycle:c-1,copies:copiesA};
+    if(stopB===null && demandB>=1 && gainB<1) stopB={cycle:c-1,copies:copiesB};
+    copiesA+=gainA; copiesB+=gainB;
+    arrA.push(copiesA); arrB.push(copiesB); gA.push(gainA); gB.push(gainB);
+  }
+  return{arrA,arrB,gA,gB,stopA,stopB,exclA,exclB,budgetExclA,budgetExclB,budgetOverlap};
+}
+
+let absChart=null,relChart=null,lastRows=null;
+const fmtY=v=>v>=1e9?(v/1e9).toFixed(1)+'G':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'k':Math.round(v);
+const fmtN=v=>v>=1e9?(v/1e9).toFixed(2)+'G':v>=1e6?(v/1e6).toFixed(2)+'M':v>=1e3?(v/1e3).toFixed(1)+'k':Math.round(v);
+const fmtFull=v=>Math.round(v).toLocaleString('en-US');
+const CA='#378ADD',CB='#1D9E75';
+Chart.defaults.color='#888'; Chart.defaults.borderColor='#333';
+
+document.getElementById('calcBtn').addEventListener('click',function(){
+  const N0A=+document.getElementById('n0a').value, N0B=+document.getElementById('n0b').value;
+  const EA=+document.getElementById('effA').value, EB=+document.getElementById('effB').value;
+  const pnM=+document.getElementById('primerConc').value, ul=+document.getElementById('assayVol').value;
+  const cycs=+document.getElementById('cycles').value;
+  const vA=+document.getElementById('varA').value||0, vB=+document.getElementById('varB').value||0, vAB=+document.getElementById('varAB').value||0;
+  const pool=Math.max(1,vA+vB-vAB), totalMols=nmol2mol(pnM,ul), mpp=totalMols/pool;
+  const labels=Array.from({length:cycs+1},(_,i)=>i);
+  const sim=simulate(N0A,EA,N0B,EB,mpp,vA,vB,vAB,cycs,activeModel);
+  const arrA=sim.arrA,arrB=sim.arrB,gA=sim.gA,gB=sim.gB,stopA=sim.stopA,stopB=sim.stopB;
+
+  const mf=activeModel==='shelton'
+    ? '<div class="frow"><b>Shelton et al.</b> &mdash; cumulative: <code>S(c) = N0&middot;(1+E)^c</code>, gain/cycle: <code>dS = Copies(c-1)&middot;E</code></div>'
+    : '<div class="frow"><b>New Model</b> &mdash; cumulative: <code>S(c) = N0&middot;E&middot;(2^c - c - 1)</code>, gain/cycle: <code>dS = N0&middot;E&middot;(2^(c-1) - 1)</code></div>';
+  document.getElementById('formulaBox').innerHTML=mf
+    +'<div class="frow"><b>Total primer molecules</b>: <code>'+pnM+' nM &middot; '+ul+' uL &middot; N_A = '+fmtN(totalMols)+'</code> ('+totalMols.toExponential(3)+')</div>'
+    +'<div class="frow"><b>Per variant</b>: <code>'+fmtN(totalMols)+' / '+pool+' = '+fmtN(mpp)+'</code> molecules</div>'
+    +'<div class="frow"><b>Budget excl. A</b>: '+sim.exclA+'&times; = <code>'+fmtN(sim.budgetExclA)+'</code> &middot; <b>excl. B</b>: '+sim.exclB+'&times; = <code>'+fmtN(sim.budgetExclB)+'</code> &middot; <b>Overlap</b>: '+vAB+'&times; = <code>'+fmtN(sim.budgetOverlap)+'</code></div>'
+    +'<div class="frow" style="color:#666;margin-top:6px;">Stop = first cycle in which the ideal demand is &ge; 1 but the actual gain falls below 1 due to primer depletion. Exclusive pools apply per template only; the overlap is allocated competitively in proportion to demand (i.e., proportional to copy number).</div>';
+
+  if(stopA){document.getElementById('stopA').textContent='Cycle '+stopA.cycle;document.getElementById('stopAsub').textContent=fmtN(stopA.copies)+' copies at stop';}
+  else{document.getElementById('stopA').textContent='No stop';document.getElementById('stopAsub').textContent='Primer sufficient for all '+cycs+' cycles';}
+  if(stopB){document.getElementById('stopB').textContent='Cycle '+stopB.cycle;document.getElementById('stopBsub').textContent=fmtN(stopB.copies)+' copies at stop';}
+  else{document.getElementById('stopB').textContent='No stop';document.getElementById('stopBsub').textContent='Primer sufficient for all '+cycs+' cycles';}
+
+  const relA=labels.map(i=>{const t=arrA[i]+arrB[i]||1;return+(arrA[i]/t*100).toFixed(2);});
+  const relB=labels.map(i=>{const t=arrA[i]+arrB[i]||1;return+(arrB[i]/t*100).toFixed(2);});
+
+  let rows=''; lastRows=[['Cycle','CopiesA','GainA','CopiesB','GainB','ProportionA_%','ProportionB_%']];
+  for(let i=0;i<=cycs;i++){
+    let cls='';
+    if(stopA&&i===stopA.cycle) cls='stopA-row';
+    if(stopB&&i===stopB.cycle) cls=cls?cls+' stopB-row':'stopB-row';
+    rows+='<tr class="'+cls+'"><td>'+i+'</td><td>'+fmtFull(arrA[i])+'</td><td>'+(i===0?'-':fmtFull(gA[i]))+'</td><td>'+fmtFull(arrB[i])+'</td><td>'+(i===0?'-':fmtFull(gB[i]))+'</td><td>'+relA[i]+'%</td><td>'+relB[i]+'%</td></tr>';
+    lastRows.push([i,Math.round(arrA[i]),i===0?'':Math.round(gA[i]),Math.round(arrB[i]),i===0?'':Math.round(gB[i]),relA[i],relB[i]]);
+  }
+  document.getElementById('resultBody').innerHTML=rows;
+
+  const absDs=[
+    {label:'Template A',data:arrA,borderColor:CA,backgroundColor:'transparent',borderWidth:2.5,pointRadius:0,tension:0},
+    {label:'Template B',data:arrB,borderColor:CB,backgroundColor:'transparent',borderWidth:2.5,borderDash:[6,3],pointRadius:0,tension:0}];
+  if(stopA) absDs.push({label:'Stopp A',data:labels.map(i=>i===stopA.cycle?arrA[i]:null),borderColor:CA,backgroundColor:CA,pointRadius:labels.map(i=>i===stopA.cycle?6:0),pointStyle:'triangle',showLine:false,borderWidth:0});
+  if(stopB) absDs.push({label:'Stopp B',data:labels.map(i=>i===stopB.cycle?arrB[i]:null),borderColor:CB,backgroundColor:CB,pointRadius:labels.map(i=>i===stopB.cycle?6:0),pointStyle:'triangle',showLine:false,borderWidth:0});
+
+  if(absChart){absChart.destroy();absChart=null;}
+  if(relChart){relChart.destroy();relChart=null;}
+  const xOpts={title:{display:true,text:'Cycles',font:{size:11},color:'#888'},ticks:{font:{size:10},color:'#888'},grid:{color:'#2a2a2a'}};
+
+  absChart=new Chart(document.getElementById('absCanvas'),{type:'line',data:{labels,datasets:absDs},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+      scales:{x:xOpts,y:Object.assign({},xOpts,{grace:'10%',title:{display:true,text:'Copies',font:{size:11},color:'#888'},ticks:{font:{size:10},color:'#888',callback:fmtY}})}}});
+
+  relChart=new Chart(document.getElementById('relCanvas'),{type:'bar',data:{labels,datasets:[
+      {label:'Template A',data:relA,backgroundColor:CA,stack:'s'},
+      {label:'Template B',data:relB,backgroundColor:CB,stack:'s'}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+      scales:{x:Object.assign({},xOpts,{stacked:true,ticks:{font:{size:9},color:'#888',maxTicksLimit:10,autoSkip:true}}),
+        y:Object.assign({},xOpts,{stacked:true,min:0,max:100,title:{display:true,text:'%',font:{size:11},color:'#888'},ticks:{font:{size:9},color:'#888',callback:v=>v+'%'}})}}});
+
+  const mn=activeModel==='shelton'?'Shelton et al.':'New Model';
+  document.getElementById('absLegend').innerHTML='<span><span style="background:'+CA+';height:2px;width:16px;display:inline-block;vertical-align:middle;"></span>Template A</span><span><span style="border-top:2.5px dashed '+CB+';height:0;width:16px;display:inline-block;vertical-align:middle;"></span>Template B</span><span style="margin-left:12px;color:#555;">Model: '+mn+'</span>';
+  document.getElementById('relLegend').innerHTML='<span><span style="background:'+CA+';height:11px;width:11px;display:inline-block;border-radius:2px;"></span>Template A</span><span><span style="background:'+CB+';height:11px;width:11px;display:inline-block;border-radius:2px;"></span>Template B</span>';
+});
+
+document.getElementById('csvBtn').addEventListener('click',function(){
+  if(!lastRows) return;
+  const csv=lastRows.map(r=>r.join(';')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='pcr_metabarcoding_result.csv'; a.click();
+});
+
+document.getElementById('calcBtn').click();
+</script>
+</body>
+</html>
