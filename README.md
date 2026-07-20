@@ -4,7 +4,22 @@ This repository contains the raw data and analysis code underlying:
 
 > **Characterizing mitochondrial copy number variation and PCR amplification bias as sources of quantitative constraints in DNA metabarcoding**
 
-The script [`supporting information 10.py`](supporting%20information%2010.py) reproduces the entire quantitative analysis of the paper end to end — from the raw qPCR, ddPCR and metabarcoding read data to every figure, table, and supporting information file reported in the manuscript.
+The script [`supporting information/supporting information 10.py`](supporting%20information/supporting%20information%2010.py) reproduces the entire quantitative analysis of the paper end to end — from the raw qPCR, ddPCR and metabarcoding read data to every figure, table, and supporting information file reported in the manuscript.
+
+## Repository structure
+
+```
+├── figures/                 Figures 2–4 (.pdf/.png)
+├── tables/                  Table 1 and Table 2 (.xlsx)
+├── supporting information/  Input data, the analysis script, and all SI outputs
+└── pcr_simulator/           Standalone PCR/metabarcoding simulator (HTML)
+```
+
+### PCR/metabarcoding simulator
+
+The interactive simulator in [`pcr_simulator/`](pcr_simulator/) is hosted via GitHub Pages and can be used directly in the browser, no download required:
+
+**https://dominikbuchner.github.io/quantitative_metabarcoding/pcr_simulator/pcr_metabarcoding_simulator_en.html**
 
 ## Requirements
 
@@ -21,15 +36,19 @@ pip install -r requirements.txt
 
 ## Running the analysis
 
-Run the script from within this folder (it reads and writes files using relative paths):
+The script locates its input files and writes its outputs relative to its own location, so it can be run from any working directory:
 
 ```bash
-python "supporting information 10.py"
+python "supporting information/supporting information 10.py"
 ```
+
+Figures are written to `figures/`, tables to `tables/`, and all other outputs to `supporting information/`, regardless of where the command is run from.
 
 Runtime is a few minutes on a standard laptop. Console output includes read-filtering statistics and Wilcoxon signed-rank test results for the aliquot/replicate reproducibility checks reported in the text.
 
 ## Input data (required, included in this repository)
+
+Located in [`supporting information/`](supporting%20information/):
 
 | File | Content |
 |---|---|
@@ -42,13 +61,13 @@ Runtime is a few minutes on a standard laptop. Console output includes read-filt
 
 ## Output
 
-Running the script (re-)generates the following files in this folder:
+Running the script (re-)generates the following files:
 
-- **Figures:** `figure 2.pdf`, `figure 3.pdf`/`.png`, `figure 4.pdf`/`.png`
-- **Tables:** `table 1.xlsx`, `table 2.xlsx`
-- **Supporting information:** `supporting information 4.pdf`, `7.pdf`, `8.pdf`, `9.xlsx`, `11.xlsx`, `12.pdf`, `13.pdf`, `14.pdf`, `15.xlsx`, `18.pdf`/`.png`, `19.xlsx`, `20.pdf`/`.png`, `21.xlsx`, `22.pdf`/`.png`
+- **Figures** (in [`figures/`](figures/)): `figure 2.pdf`, `figure 3.pdf`/`.png`, `figure 4.pdf`/`.png`
+- **Tables** (in [`tables/`](tables/)): `table 1.xlsx`, `table 2.xlsx`
+- **Supporting information** (in [`supporting information/`](supporting%20information/)): `supporting information 4.pdf`, `7.pdf`, `8.pdf`, `9.xlsx`, `11.xlsx`, `12.pdf`, `13.pdf`, `14.pdf`, `15.xlsx`, `18.pdf`/`.png`, `19.xlsx`, `20.pdf`/`.png`, `21.xlsx`, `22.pdf`/`.png`
 
-All other supporting information files in this folder (e.g. SI 16, 17) were prepared independently of this script and are provided as-is.
+All other supporting information files (e.g. SI 16, 17) were prepared independently of this script and are provided as-is.
 
 ## Structure of the script
 

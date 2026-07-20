@@ -7,6 +7,13 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import matplotlib.patches as mpatches
 from scipy.stats import linregress, wilcoxon
 
+# This script lives in the "supporting information" folder; input SI files sit
+# alongside it, while figures and tables live in their own sibling folders.
+SI_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SI_DIR.parent
+FIGURES_DIR = REPO_ROOT / "figures"
+TABLES_DIR = REPO_ROOT / "tables"
+
 ORDER_COLORS = ["#648FFF", "#785EF0", "#DC267F", "#FE6100", "#FFB000"]
 ORDER_NAMES = ["Amphipoda", "Blattodea", "Diptera", "Hymenoptera", "Lepidoptera"]
 ORDER_PALETTE = dict(zip(ORDER_NAMES, ORDER_COLORS))
@@ -131,7 +138,7 @@ def supporting_information_4(supporting_information_3: Path) -> None:
     fig.subplots_adjust(right=0.95)
 
     # --- Export ---
-    plt.savefig("supporting information 4.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 4.pdf", dpi=300, bbox_inches="tight")
 
 
 def aggregate_metabarcoding_data(
@@ -353,7 +360,7 @@ def plot_aliquot_consistency(aggregated_read_data: pd.DataFrame) -> None:
 
     fig.suptitle("Aliquot consistency of relative read proportions")
     fig.subplots_adjust(bottom=0.15)
-    plt.savefig("supporting information 7.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 7.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -418,7 +425,7 @@ def aggregate_ddpcr_data(supporting_information_5: Path) -> pd.DataFrame:
     ax.set_ylabel("Relative mtDNA copies in replicate B")
     ax.set_title("Replicate consistency of relative mtDNA copy numbers")
     ax.legend(frameon=True, handletextpad=0.3)
-    plt.savefig("supporting information 8.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 8.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
     # --- Wilcoxon signed-rank test: replicate A vs. replicate B ---
@@ -724,7 +731,7 @@ def compute_fold_changes_and_ranks(full_results: pd.DataFrame) -> pd.DataFrame:
 
 
 def export_table1_rank_concordance(
-    full_results: pd.DataFrame, filename: str = "table 1.xlsx"
+    full_results: pd.DataFrame, filename: str = str(TABLES_DIR / "table 1.xlsx")
 ) -> None:
     """Export Table 1: how often do the three measurement types agree on rank order?
 
@@ -753,7 +760,8 @@ def export_table1_rank_concordance(
 
 
 def export_si11_over_under(
-    full_results: pd.DataFrame, filename: str = "supporting information 11.xlsx"
+    full_results: pd.DataFrame,
+    filename: str = str(SI_DIR / "supporting information 11.xlsx"),
 ) -> None:
     """Export Supporting Information 11: over- and under-representation counts per taxon.
 
@@ -1246,8 +1254,8 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     axes3[1].legend(fontsize=8, loc="lower right", markerscale=1.5)
 
     fig3.tight_layout()
-    plt.savefig("figure 3.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig("figure 3.png", dpi=300, bbox_inches="tight")
+    plt.savefig(FIGURES_DIR / "figure 3.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(FIGURES_DIR / "figure 3.png", dpi=300, bbox_inches="tight")
     plt.close(fig3)
 
     # ----------------------------------------------------------------
@@ -1478,8 +1486,8 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     ax_bottom.set_ylim(0, None)
     ax_bottom.legend(loc="upper right", fontsize=9)
 
-    plt.savefig("figure 4.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig("figure 4.png", dpi=300, bbox_inches="tight")
+    plt.savefig(FIGURES_DIR / "figure 4.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(FIGURES_DIR / "figure 4.png", dpi=300, bbox_inches="tight")
     plt.close(fig4)
 
     # ----------------------------------------------------------------
@@ -1494,7 +1502,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
             }
             for order in ORDER_NAMES
         ]
-    ).to_excel("table 2.xlsx", index=False)
+    ).to_excel(TABLES_DIR / "table 2.xlsx", index=False)
 
     # ----------------------------------------------------------------
     # Supporting Information 18: scatter per cycle count, 2 models
@@ -1568,8 +1576,8 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
                     bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
                 )
     axes15[0, 1].legend(fontsize=7, loc="lower right", markerscale=1.5)
-    plt.savefig("supporting information 18.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig("supporting information 18.png", dpi=150, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 18.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 18.png", dpi=150, bbox_inches="tight")
     plt.close(fig15)
 
     # ----------------------------------------------------------------
@@ -1632,7 +1640,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     )
     si16 = si16.merge(ait_cols, on=["sample", "cycles"], how="left")
 
-    si16.to_excel("supporting information 19.xlsx", index=False)
+    si16.to_excel(SI_DIR / "supporting information 19.xlsx", index=False)
 
     # ----------------------------------------------------------------
     # Supporting Information 20: scatter per insect order, 2 models
@@ -1710,8 +1718,8 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
                     bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
                 )
     axes20[0, 1].legend(fontsize=7, loc="lower right", markerscale=1.5)
-    plt.savefig("supporting information 20.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig("supporting information 20.png", dpi=150, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 20.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 20.png", dpi=150, bbox_inches="tight")
     plt.close(fig20)
 
     # ----------------------------------------------------------------
@@ -1725,7 +1733,9 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
         }
         for order in ORDER_NAMES
     ]
-    pd.DataFrame(si21_rows).to_excel("supporting information 21.xlsx", index=False)
+    pd.DataFrame(si21_rows).to_excel(
+        SI_DIR / "supporting information 21.xlsx", index=False
+    )
 
     # ----------------------------------------------------------------
     # Supporting Information 22: BF3 scatter — uncorrected vs. corrected
@@ -1803,8 +1813,8 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     )
     fig22.suptitle("BF3 — constant bias correction", fontsize=12)
     plt.tight_layout()
-    plt.savefig("supporting information 22.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig("supporting information 22.png", dpi=150, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 22.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 22.png", dpi=150, bbox_inches="tight")
     plt.close(fig22)
 
 
@@ -1865,20 +1875,20 @@ def main():
         and BF3 was only sequenced at c=20.
     """
     # --- Input files ---
-    supporting_information_1 = Path(
-        "supporting information 1.xlsx"
+    supporting_information_1 = (
+        SI_DIR / "supporting information 1.xlsx"
     )  # community compositions + biomass
-    supporting_information_2 = Path(
-        "supporting information 2.xlsx"
+    supporting_information_2 = (
+        SI_DIR / "supporting information 2.xlsx"
     )  # ddPCR primer/probe sequences
-    supporting_information_3 = Path(
-        "supporting information 3.xlsx"
+    supporting_information_3 = (
+        SI_DIR / "supporting information 3.xlsx"
     )  # qPCR validation data
-    supporting_information_5 = Path(
-        "supporting information 5.xlsx"
+    supporting_information_5 = (
+        SI_DIR / "supporting information 5.xlsx"
     )  # ddPCR raw copy numbers
-    supporting_information_6 = Path(
-        "supporting information 6.parquet.snappy"
+    supporting_information_6 = (
+        SI_DIR / "supporting information 6.parquet.snappy"
     )  # metabarcoding raw reads
 
     # --- Step 1: qPCR primer validation heatmap ---
@@ -1901,7 +1911,7 @@ def main():
     # --- Step 5: Fold-change, rank concordance, and Figure 2 ---
     full_results = compute_fold_changes_and_ranks(full_results)
     plot_fold_change_stripplot(
-        full_results, primer="fwh2", cycles=20, filename="figure 2.pdf"
+        full_results, primer="fwh2", cycles=20, filename=str(FIGURES_DIR / "figure 2.pdf")
     )
 
     # --- Step 6: Model comparison (Figure 4, Table 2, SI 15, SI 16) ---
@@ -1910,29 +1920,41 @@ def main():
     # --- Step 7: Export full results and additional figures ---
 
     # Supporting Information 9: the merged table with all measurements
-    full_results.to_excel("supporting information 9.xlsx", index=False)
+    full_results.to_excel(SI_DIR / "supporting information 9.xlsx", index=False)
 
     # Table 1: rank concordance counts (fwh2 and BF3 side by side)
-    export_table1_rank_concordance(full_results, filename="table 1.xlsx")
+    export_table1_rank_concordance(
+        full_results, filename=str(TABLES_DIR / "table 1.xlsx")
+    )
 
     # Supporting Information 11: over/concordant/underrepresentation by order
     #   Sheet 1 — Biomass vs Copies  (method-independent; one table)
     #   Sheet 2 — Copies vs Reads    (fwh2 and BF3 side by side)
     #   Sheet 3 — Biomass vs Reads   (fwh2 and BF3 side by side)
-    export_si11_over_under(full_results, filename="supporting information 11.xlsx")
+    export_si11_over_under(
+        full_results, filename=str(SI_DIR / "supporting information 11.xlsx")
+    )
 
     # Supporting Information 12 & 12: stacked barplots of community composition
     # at c=20 for fwh2 (SI 11) and BF3 (SI 12)
     plot_stacked_barplots(
-        full_results, primer="fwh2", cycles=20, filename="supporting information 12.pdf"
+        full_results,
+        primer="fwh2",
+        cycles=20,
+        filename=str(SI_DIR / "supporting information 12.pdf"),
     )
     plot_stacked_barplots(
-        full_results, primer="bf3", cycles=20, filename="supporting information 13.pdf"
+        full_results,
+        primer="bf3",
+        cycles=20,
+        filename=str(SI_DIR / "supporting information 13.pdf"),
     )
 
     # Supporting Information 14: how read proportions change across cycle counts
     plot_reads_per_cycle(
-        full_results, primer="fwh2", filename="supporting information 14.pdf"
+        full_results,
+        primer="fwh2",
+        filename=str(SI_DIR / "supporting information 14.pdf"),
     )
 
     # Supporting Information 15: cycle calibration table (fwh2 only).
@@ -1944,7 +1966,9 @@ def main():
     cycle_cal_export = full_results.merge(
         cycle_cal_table, on=["sample", "order", "primer"], how="left"
     )
-    cycle_cal_export.to_excel("supporting information 15.xlsx", index=False)
+    cycle_cal_export.to_excel(
+        SI_DIR / "supporting information 15.xlsx", index=False
+    )
 
 
 if __name__ == "__main__":
