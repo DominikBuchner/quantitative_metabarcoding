@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -5,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import matplotlib.patches as mpatches
-from scipy.stats import linregress, wilcoxon
+from scipy.stats import kruskal, linregress, shapiro, spearmanr, wilcoxon
 
 # This script lives in the "supporting information" folder; input SI files sit
 # alongside it, while figures and tables live in their own sibling folders.
@@ -19,8 +20,8 @@ ORDER_NAMES = ["Amphipoda", "Blattodea", "Diptera", "Hymenoptera", "Lepidoptera"
 ORDER_PALETTE = dict(zip(ORDER_NAMES, ORDER_COLORS))
 
 
-def supporting_information_4(supporting_information_3: Path) -> None:
-    """Create the qPCR validation heatmap (Supporting Information 4).
+def supporting_information_6(supporting_information_5: Path) -> None:
+    """Create the qPCR validation heatmap (Supporting Information 6).
 
     Before running metabarcoding, we checked with taxon-specific qPCR assays
     whether each target insect order was actually detectable in each community
@@ -29,16 +30,16 @@ def supporting_information_4(supporting_information_3: Path) -> None:
     cell is coloured by detection outcome: true positive (detected as expected),
     true negative (absent as expected), false positive (detected but absent),
     or false negative (absent but expected). Both extraction replicates (A and B)
-    are shown as separate panels. The result is saved as Supporting Information 4.
+    are shown as separate panels. The result is saved as Supporting Information 6.
     """
     # --- Data loading ---
-    supporting_information_3 = pd.read_excel(supporting_information_3)
+    supporting_information_5 = pd.read_excel(supporting_information_5)
 
     # Fixed display order of the five qPCR target taxa (rows of the heatmap)
     TARGET_ORDER = ["Amphipoda", "Diptera", "Lepidoptera", "Blattodea", "Hymenoptera"]
 
     # Sample order follows the original table; negative controls are already last
-    SAMPLE_ORDER = supporting_information_3["sample"].unique().tolist()
+    SAMPLE_ORDER = supporting_information_5["sample"].unique().tolist()
 
     # --- Colour mapping for the four detection states ---
     STATE_LABELS = {
@@ -63,8 +64,8 @@ def supporting_information_4(supporting_information_3: Path) -> None:
 
     # --- Helper: build a (target × sample) matrix for one replicate ---
     def make_matrix(replicate):
-        sub = supporting_information_3[
-            supporting_information_3["replicate"] == replicate
+        sub = supporting_information_5[
+            supporting_information_5["replicate"] == replicate
         ]
         pivot = sub.pivot(index="Target Name", columns="sample", values="state")
         # Enforce consistent row/column order across replicates
@@ -138,13 +139,13 @@ def supporting_information_4(supporting_information_3: Path) -> None:
     fig.subplots_adjust(right=0.95)
 
     # --- Export ---
-    plt.savefig(SI_DIR / "supporting information 4.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 6.pdf", dpi=300, bbox_inches="tight")
 
 
 def aggregate_metabarcoding_data(
-    supporting_information_1: Path, supporting_information_6: Path
+    supporting_information_1: Path, supporting_information_11: Path
 ) -> pd.DataFrame:
-    """Load and clean the raw metabarcoding sequencing data (Supporting Information 6).
+    """Load and clean the raw metabarcoding sequencing data (Supporting Information 11).
 
     Metabarcoding produces a table of DNA sequence counts ("reads") for each
     taxon detected in each sample. This function loads that raw table, sums
@@ -158,10 +159,10 @@ def aggregate_metabarcoding_data(
     Returns the cleaned read table.
     """
     # --- Load and aggregate raw read data ---
-    supporting_information_6 = pd.read_parquet(supporting_information_6)
+    supporting_information_11 = pd.read_parquet(supporting_information_11)
 
-    supporting_information_6 = (
-        supporting_information_6.groupby(
+    supporting_information_11 = (
+        supporting_information_11.groupby(
             by=["sample", "aliquot", "cycles", "order", "primer"]
         )
         .sum()["read_count"]
@@ -174,16 +175,16 @@ def aggregate_metabarcoding_data(
 
     # --- Filter to samples present in SI 1 (drops e.g. 26, 92, 93) ---
     valid_samples = set(expected_taxa["sample"])
-    supporting_information_6 = supporting_information_6[
-        supporting_information_6["sample"].isin(valid_samples)
+    supporting_information_11 = supporting_information_11[
+        supporting_information_11["sample"].isin(valid_samples)
     ]
 
     # Total reads per primer before removing co-amplifications
-    pre_filter_reads = supporting_information_6.groupby("primer")["read_count"].sum()
+    pre_filter_reads = supporting_information_11.groupby("primer")["read_count"].sum()
 
     # --- Build a complete design grid ---
     # All experimental conditions that were actually sequenced
-    design = supporting_information_6[
+    design = supporting_information_11[
         ["sample", "aliquot", "cycles", "primer"]
     ].drop_duplicates()
 
@@ -192,7 +193,7 @@ def aggregate_metabarcoding_data(
 
     # --- Merge actual read counts onto the grid; fill missing with 0 ---
     result = design_grid.merge(
-        supporting_information_6,
+        supporting_information_11,
         on=["sample", "aliquot", "cycles", "order", "primer"],
         how="left",
     )
@@ -299,13 +300,13 @@ def absolute_reads_to_relative_reads(
 
 
 def plot_aliquot_consistency(aggregated_read_data: pd.DataFrame) -> None:
-    """Plot extraction aliquot reproducibility (Supporting Information 7).
+    """Plot extraction aliquot reproducibility (Supporting Information 12).
 
     For each primer, creates a scatter plot comparing aliquot 1 vs. aliquot 2
     relative read proportions for every taxon and sample. Points lying on the
     1:1 diagonal indicate that both aliquots gave the same result. Points far
     from the diagonal indicate extraction variability for that taxon.
-    Saved as Supporting Information 7.
+    Saved as Supporting Information 12.
     """
     PRIMER_LABELS = {"fwh2": "fwh2", "bf3": "BF3"}
 
@@ -360,25 +361,25 @@ def plot_aliquot_consistency(aggregated_read_data: pd.DataFrame) -> None:
 
     fig.suptitle("Aliquot consistency of relative read proportions")
     fig.subplots_adjust(bottom=0.15)
-    plt.savefig(SI_DIR / "supporting information 7.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 12.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
-def aggregate_ddpcr_data(supporting_information_5: Path) -> pd.DataFrame:
+def aggregate_ddpcr_data(supporting_information_8: Path) -> pd.DataFrame:
     """Load ddPCR copy number data, verify replicate agreement, and pool replicates.
 
     Droplet digital PCR (ddPCR) gives an absolute count of mitochondrial DNA
     (mtDNA) copies per taxon in each sample. This function loads those raw
-    counts (Supporting Information 5), converts them to relative proportions
+    counts (Supporting Information 8), converts them to relative proportions
     (each taxon's copies divided by total copies in that sample), and checks
     whether two independent ddPCR replicates (A and B) agree using a Wilcoxon
     signed-rank test. A scatter plot comparing the replicates is saved as
-    Supporting Information 8. The two replicates are then averaged to obtain
+    Supporting Information 13. The two replicates are then averaged to obtain
     a single reliable copy-number estimate per sample and taxon.
     Returns the pooled copy-number table.
     """
     # --- Load ddPCR data ---
-    ddpcr_data = pd.read_excel(supporting_information_5)
+    ddpcr_data = pd.read_excel(supporting_information_8)
 
     # --- Compute relative copy numbers per (sample, replicate) ---
     total_copies = (
@@ -398,7 +399,7 @@ def aggregate_ddpcr_data(supporting_information_5: Path) -> pd.DataFrame:
         ddpcr_data["mtDNA copies"] / ddpcr_data["total copies"]
     )
 
-    # --- Scatterplot: replicate A vs. replicate B (supporting information 8) ---
+    # --- Scatterplot: replicate A vs. replicate B (supporting information 13) ---
     pivot = ddpcr_data.pivot_table(
         index=["sample", "order"],
         columns="replicate",
@@ -425,7 +426,7 @@ def aggregate_ddpcr_data(supporting_information_5: Path) -> pd.DataFrame:
     ax.set_ylabel("Relative mtDNA copies in replicate B")
     ax.set_title("Replicate consistency of relative mtDNA copy numbers")
     ax.legend(frameon=True, handletextpad=0.3)
-    plt.savefig(SI_DIR / "supporting information 8.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 13.pdf", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
     # --- Wilcoxon signed-rank test: replicate A vs. replicate B ---
@@ -468,7 +469,7 @@ def final_aggregation(
     sequences), relative mtDNA copy numbers from ddPCR, and biomass from
     weighing. After merging, every row in the resulting table holds all three
     values for one taxon in one sample at one PCR cycle count.
-    This master table (Supporting Information 9) is the basis for all
+    This master table (Supporting Information 14) is the basis for all
     subsequent comparisons and figures.
     """
     supporting_information_1 = pd.read_excel(supporting_information_1)
@@ -489,14 +490,14 @@ def final_aggregation(
 def plot_stacked_barplots(
     full_results: pd.DataFrame, primer: str, cycles: int, filename: str
 ) -> None:
-    """Plot per-sample community compositions as stacked bar charts (SI 11/12).
+    """Plot per-sample community compositions as stacked bar charts (SI 18/19).
 
     Creates a 9×9 grid (one panel per sample) where each panel shows three
     stacked bars side by side: relative biomass, relative mtDNA copies, and
     relative metabarcoding reads. Each segment within a bar is coloured by
     insect order. This allows visual comparison of how well the three
     measurement types agree on the relative abundances within each community.
-    Saved as Supporting Information 12 (fwh2) and 13 (BF3).
+    Saved as Supporting Information 18 (fwh2) and 19 (BF3).
     """
     sub = full_results[
         (full_results["primer"] == primer) & (full_results["cycles"] == cycles)
@@ -590,7 +591,7 @@ def plot_stacked_barplots(
 def plot_reads_per_cycle(
     full_results: pd.DataFrame, primer: str, filename: str
 ) -> None:
-    """Plot how relative read proportions change across PCR cycle counts (SI 14).
+    """Plot how relative read proportions change across PCR cycle counts (SI 20).
 
     Creates a 9×9 grid (one panel per sample) where the x-axis shows PCR
     cycle count (6, 8, 10, … 20) and each stacked bar shows the relative
@@ -598,7 +599,7 @@ def plot_reads_per_cycle(
     is cycle-independent (as our constant bias model assumes), the bar
     compositions should look the same at every cycle — any taxon that is
     over- or underrepresented at c=20 should be equally over- or
-    underrepresented at c=6. Saved as Supporting Information 14.
+    underrepresented at c=6. Saved as Supporting Information 20.
     """
     sub = full_results[full_results["primer"] == primer].copy()
     samples = sorted(sub["sample"].unique())
@@ -760,10 +761,9 @@ def export_table1_rank_concordance(
 
 
 def export_si11_over_under(
-    full_results: pd.DataFrame,
-    filename: str = str(SI_DIR / "supporting information 11.xlsx"),
+    full_results: pd.DataFrame, filename: str = str(SI_DIR / "supporting information 17.xlsx")
 ) -> None:
-    """Export Supporting Information 11: over- and under-representation counts per taxon.
+    """Export Supporting Information 17: over- and under-representation counts per taxon.
 
     For each pair of measurements and each insect order, counts how many
     samples fall into three categories: over-represented (fold-change > +1.5×),
@@ -820,7 +820,8 @@ def plot_fold_change_stripplot(
 
     Creates Figure 2 with three panels, one for each pair of measurements
     (A: biomass vs. mtDNA copies, B: copies vs. reads, C: biomass vs. reads).
-    Each dot represents one taxon in one sample, coloured by insect order.
+    Each dot represents one taxon in one sample, coloured by insect order;
+    light grey vertical lines mark the individual samples.
     The grey band marks the ±1.5× agreement zone — dots inside the band are
     considered concordant. Dots above the band indicate the second measurement
     is more than 1.5× higher; dots below indicate more than 1.5× lower.
@@ -849,6 +850,10 @@ def plot_fold_change_stripplot(
         ax.axhline(0, color="gray", linestyle="-", linewidth=0.8, zorder=1)
         ax.axhline(band, color="silver", linestyle="--", linewidth=0.6, zorder=1)
         ax.axhline(-band, color="silver", linestyle="--", linewidth=0.6, zorder=1)
+        # One light grey guide line per sample so that each dot can be
+        # assigned to its sample without jitter
+        for pos in range(len(sample_order)):
+            ax.axvline(pos, color="#d9d9d9", linewidth=0.6, zorder=0.5)
 
         sns.stripplot(
             data=sub,
@@ -859,8 +864,9 @@ def plot_fold_change_stripplot(
             hue_order=ORDER_NAMES,
             order=sample_order,
             dodge=False,
+            jitter=False,
             size=6,
-            alpha=0.8,
+            alpha=0.7,
             edgecolor="black",
             linewidth=0.3,
             legend=False,
@@ -877,7 +883,7 @@ def plot_fold_change_stripplot(
     axes[-1].set_xticklabels(sample_order, rotation=90, fontsize=10)
     axes[-1].set_xlabel("Sample", fontsize=12)
 
-    # Shared legend at bottom (scatter markers, matching SI 7 style)
+    # Shared legend at bottom (scatter markers, matching SI 12 style)
     handles = [
         plt.Line2D(
             [0],
@@ -930,7 +936,7 @@ def compute_cycle_calibration(
     each community sample. The most abundant taxon at c=20 is used as the
     reference (choice of reference does not affect the predicted proportions).
     Results are returned as a table with one row per sample and taxon,
-    later exported as Supporting Information 15.
+    later exported as Supporting Information 21.
     """
     sub = full_results[full_results["primer"] == primer].copy()
 
@@ -1024,7 +1030,9 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     3 and 4. Both E_i values are estimated from measurements at c=20 only,
     making the comparison fair.
 
-    Outputs: Figure 4, Table 2, Supporting Information 18, 19, and 20.
+    Outputs: Figure 3, Figure 4, Table 2, Supporting Information 24, 25, 26,
+    27, and 28. Supporting Information 27 and 28 cover BF3 (constant bias
+    model only).
     """
     primer = "fwh2"
     sub = full_results[full_results["primer"] == primer].copy()
@@ -1505,13 +1513,13 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     ).to_excel(TABLES_DIR / "table 2.xlsx", index=False)
 
     # ----------------------------------------------------------------
-    # Supporting Information 18: scatter per cycle count, 2 models
+    # Supporting Information 24: scatter per cycle count, 2 models (fwh2)
     # Rows = cycle count (c=6..20), Cols = cycle-dependent | constant bias
     # Prediction samples only (same as Figure 4)
     # ----------------------------------------------------------------
     cycles_list = sorted(sub["cycles"].unique())
     n_cyc = len(cycles_list)
-    fig15, axes15 = plt.subplots(
+    fig18, axes18 = plt.subplots(
         n_cyc,
         2,
         figsize=(10, n_cyc * 4),
@@ -1519,13 +1527,13 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
         sharey=True,
         gridspec_kw={"hspace": 0.15, "wspace": 0.06},
     )
-    si15_col_specs = [
+    si18_col_specs = [
         ("cycle-dependent", "Cycle-dependent bias model"),
         ("non-exponential", "Constant bias model"),
     ]
     for row_idx, c in enumerate(cycles_list):
-        for col_idx, (method_name, col_title) in enumerate(si15_col_specs):
-            ax = axes15[row_idx, col_idx]
+        for col_idx, (method_name, col_title) in enumerate(si18_col_specs):
+            ax = axes18[row_idx, col_idx]
             md = df_common[
                 (df_common["method"] == method_name) & (df_common["cycles"] == c)
             ]
@@ -1575,14 +1583,15 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
                     fontsize=8,
                     bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
                 )
-    axes15[0, 1].legend(fontsize=7, loc="lower right", markerscale=1.5)
-    plt.savefig(SI_DIR / "supporting information 18.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig(SI_DIR / "supporting information 18.png", dpi=150, bbox_inches="tight")
-    plt.close(fig15)
+    axes18[0, 1].legend(fontsize=7, loc="lower right", markerscale=1.5)
+    plt.savefig(SI_DIR / "supporting information 24.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 24.png", dpi=150, bbox_inches="tight")
+    plt.close(fig18)
 
     # ----------------------------------------------------------------
-    # Supporting Information 19: SI 13 extended with bias model predictions
-    # Adds 4 columns: E_i per taxon + predicted copies for both models
+    # Supporting Information 25: SI 21 extended with bias model predictions
+    # Adds E_i per taxon, predicted copies for both models and per-sample
+    # Aitchison distances for all four approaches
     # Predictions computed for ALL fwh2 samples (in- and out-of-sample)
     # ----------------------------------------------------------------
     # Bias predictions for all (sample, cycles) in fwh2 data
@@ -1606,26 +1615,26 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
 
     ct = cycle_cal_table.copy()
     ct["primer"] = primer
-    si16 = full_results.merge(ct, on=["sample", "order", "primer"], how="left")
+    si19 = full_results.merge(ct, on=["sample", "order", "primer"], how="left")
 
     # E_i values are fwh2-specific; bf3 rows get NaN
-    si16["E_i, cycle-dependent bias"] = np.where(
-        si16["primer"] == primer,
-        si16["order"].map(e_exp),
+    si19["E_i, cycle-dependent bias"] = np.where(
+        si19["primer"] == primer,
+        si19["order"].map(e_exp),
         np.nan,
     )
-    si16["E_i, constant bias"] = np.where(
-        si16["primer"] == primer,
-        si16["order"].map(e_orig),
+    si19["E_i, constant bias"] = np.where(
+        si19["primer"] == primer,
+        si19["order"].map(e_orig),
         np.nan,
     )
-    si16["pred_copies_cycle_dep_bias"] = [
+    si19["pred_copies_cycle_dep_bias"] = [
         pred_exp_all.get((r.sample, r.cycles, r.order), np.nan)
-        for r in si16.itertuples()
+        for r in si19.itertuples()
     ]
-    si16["pred_copies_constant_bias"] = [
+    si19["pred_copies_constant_bias"] = [
         pred_ne_all.get((r.sample, r.cycles, r.order), np.nan)
-        for r in si16.itertuples()
+        for r in si19.itertuples()
     ]
 
     # Aitchison distances: one value per (sample, cycles), repeated across orders
@@ -1638,12 +1647,12 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
             "d_cc":     "aitchison_cycle_calibration",
         }
     )
-    si16 = si16.merge(ait_cols, on=["sample", "cycles"], how="left")
+    si19 = si19.merge(ait_cols, on=["sample", "cycles"], how="left")
 
-    si16.to_excel(SI_DIR / "supporting information 19.xlsx", index=False)
+    si19.to_excel(SI_DIR / "supporting information 25.xlsx", index=False)
 
     # ----------------------------------------------------------------
-    # Supporting Information 20: scatter per insect order, 2 models
+    # Supporting Information 26: scatter per insect order, 2 models (fwh2)
     # Rows = order, Cols = cycle-dependent | constant bias
     # Points coloured by cycle count; prediction samples only
     # ----------------------------------------------------------------
@@ -1718,12 +1727,12 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
                     bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
                 )
     axes20[0, 1].legend(fontsize=7, loc="lower right", markerscale=1.5)
-    plt.savefig(SI_DIR / "supporting information 20.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig(SI_DIR / "supporting information 20.png", dpi=150, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 26.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 26.png", dpi=150, bbox_inches="tight")
     plt.close(fig20)
 
     # ----------------------------------------------------------------
-    # Supporting Information 21: E_i comparison table (fwh2 vs BF3)
+    # Supporting Information 27: E_i comparison table (fwh2 vs BF3)
     # ----------------------------------------------------------------
     si21_rows = [
         {
@@ -1733,12 +1742,11 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
         }
         for order in ORDER_NAMES
     ]
-    pd.DataFrame(si21_rows).to_excel(
-        SI_DIR / "supporting information 21.xlsx", index=False
-    )
+    pd.DataFrame(si21_rows).to_excel(SI_DIR / "supporting information 27.xlsx", index=False)
 
     # ----------------------------------------------------------------
-    # Supporting Information 22: BF3 scatter — uncorrected vs. corrected
+    # Supporting Information 28: BF3 scatter — uncorrected vs. corrected
+    # (c=20 only, constant bias model, same 14 calibration samples excluded)
     # ----------------------------------------------------------------
     # Prediction communities for BF3 (same 14 calibration samples excluded)
     sub_bf3 = full_results[full_results["primer"] == "bf3"].copy()
@@ -1813,52 +1821,698 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
     )
     fig22.suptitle("BF3 — constant bias correction", fontsize=12)
     plt.tight_layout()
-    plt.savefig(SI_DIR / "supporting information 22.pdf", dpi=300, bbox_inches="tight")
-    plt.savefig(SI_DIR / "supporting information 22.png", dpi=150, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 28.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(SI_DIR / "supporting information 28.png", dpi=150, bbox_inches="tight")
     plt.close(fig22)
+
+
+def supporting_information_9_1(supporting_information_10: Path) -> None:
+    """Create the qPCR figure of the second-step PCR (Figure 9.1).
+
+    The second PCR step uses the same universal tail primers for all taxa. To
+    check that it amplifies all taxa with (nearly) the same efficiency, first-step
+    amplicon pools of the five taxa were measured by qPCR (18 wells per taxon).
+    Panel A shows the baseline-corrected amplification curves (thin lines: single
+    wells, thick lines: median per taxon). Panel B shows the PCR efficiency E per
+    well (LinRegPCR) per taxon as box plot with single wells; E = 2 is a perfect
+    doubling per cycle. Wells without an efficiency estimate (no-template
+    controls) are not shown. Input: Supporting Information 10.
+    """
+    # --- Data loading ---
+    cycles = [str(c) for c in range(1, 41)]
+    curves = pd.read_excel(supporting_information_10, sheet_name="Baseline-corrected")
+    curves.columns = [str(c) for c in curves.columns]
+    curves = curves[curves["Taxon"].isin(ORDER_NAMES)]
+    wells = pd.read_excel(supporting_information_10, sheet_name="Per-well results")
+    wells = wells.rename(columns={"PCR efficiency E (per well)": "E"})
+    wells = wells[wells["Taxon"].isin(ORDER_NAMES)].dropna(subset=["E"])
+
+    groups = [wells.loc[wells["Taxon"] == t, "E"].values for t in ORDER_NAMES]
+
+    fig, (ax_curves, ax_eff) = plt.subplots(
+        1, 2, figsize=(13, 5.2), gridspec_kw={"width_ratios": [1.15, 1]}
+    )
+
+    # --- Panel A: amplification plot (log scale) ---
+    x = np.arange(1, 41)
+    for _, row in curves.iterrows():
+        ax_curves.plot(
+            x,
+            row[cycles].astype(float).values,
+            color=ORDER_PALETTE[row["Taxon"]],
+            lw=1,
+            alpha=0.6,
+        )
+    for taxon in ORDER_NAMES:
+        median_curve = curves.loc[curves["Taxon"] == taxon, cycles].astype(float).median()
+        ax_curves.plot(x, median_curve.values, color=ORDER_PALETTE[taxon], lw=3.5, alpha=0.85)
+    ax_curves.set_yscale("log")
+    ax_curves.set_ylim(1e-2, 12)
+    ax_curves.set_xlim(10, 40)
+    ax_curves.set_xlabel("Cycle")
+    ax_curves.set_ylabel("Baseline-corrected fluorescence (Rn, log scale)")
+    ax_curves.set_title("A)", fontsize=12, loc="left")
+    ax_curves.legend(
+        handles=[
+            plt.Line2D([0], [0], color=ORDER_PALETTE[t], lw=2, label=t)
+            for t in ORDER_NAMES
+        ],
+        frameon=False,
+        loc="lower right",
+    )
+
+    # --- Panel B: PCR efficiency per well ---
+    sns.boxplot(
+        data=wells,
+        x="Taxon",
+        y="E",
+        order=ORDER_NAMES,
+        hue="Taxon",
+        palette=ORDER_PALETTE,
+        legend=False,
+        width=0.55,
+        showfliers=False,
+        boxprops=dict(alpha=0.45, edgecolor="0.25"),
+        medianprops=dict(color="0.15"),
+        whiskerprops=dict(color="0.25"),
+        capprops=dict(color="0.25"),
+        ax=ax_eff,
+    )
+    sns.stripplot(
+        data=wells,
+        x="Taxon",
+        y="E",
+        order=ORDER_NAMES,
+        hue="Taxon",
+        palette=ORDER_PALETTE,
+        legend=False,
+        size=4.5,
+        alpha=0.85,
+        edgecolor="black",
+        linewidth=0.3,
+        jitter=0.18,
+        ax=ax_eff,
+    )
+    ax_eff.axhline(2, color="0.5", ls="--", lw=0.8)
+    ax_eff.set_ylim(1, 2.03)
+    ax_eff.set_xlabel("")
+    ax_eff.set_ylabel("PCR efficiency E (per well, LinRegPCR)")
+    ax_eff.set_xticks(range(len(ORDER_NAMES)))
+    ax_eff.set_xticklabels(
+        [f"{t}\n(n = {len(g)})" for t, g in zip(ORDER_NAMES, groups)]
+    )
+    ax_eff.set_title("B)", fontsize=12, loc="left")
+    sns.despine(ax=ax_curves)
+    sns.despine(ax=ax_eff)
+
+    plt.tight_layout()
+    plt.savefig(SI_DIR / "supporting information 9_1.pdf")
+    plt.savefig(SI_DIR / "supporting information 9_1.png", dpi=300)
+    plt.close(fig)
+
+
+def supporting_information_9_2(supporting_information_10: Path) -> None:
+    """Create the efficiency table of the second-step PCR (Table 9.1).
+
+    Summarises the per-well PCR efficiency E (LinRegPCR) of the qPCR on
+    first-step amplicon pools as mean, minimum and maximum per taxon. Wells
+    without an efficiency estimate (no-template controls) are not included.
+    Input: Supporting Information 10.
+    """
+    wells = pd.read_excel(supporting_information_10, sheet_name="Per-well results")
+    wells = wells.rename(columns={"PCR efficiency E (per well)": "E"})
+    wells = wells[wells["Taxon"].isin(ORDER_NAMES)].dropna(subset=["E"])
+
+    table = (
+        wells.groupby("Taxon")["E"]
+        .agg(["mean", "min", "max"])
+        .reindex(ORDER_NAMES)
+        .round(3)
+        .rename(columns={"mean": "mean E", "min": "min E", "max": "max E"})
+        .reset_index()
+    )
+    table.to_excel(SI_DIR / "supporting information 9_2.xlsx", index=False)
+    print(table.to_string(index=False))
+
+    # --- Statistics quoted in the text of Supporting Information 9 (printed only) ---
+    # Kruskal-Wallis test across taxa, epsilon squared = H / (N - 1), and a
+    # Shapiro-Wilk test of the residuals (value minus group mean) as justification
+    # for the rank-based test.
+    groups = [wells.loc[wells["Taxon"] == t, "E"].values for t in ORDER_NAMES]
+    h_stat, p_value = kruskal(*groups)
+    epsilon_squared = h_stat / (len(wells) - 1)
+    residuals = np.concatenate([g - g.mean() for g in groups])
+    w_stat, p_shapiro = shapiro(residuals)
+    print(
+        f"Kruskal-Wallis: H({len(groups) - 1}) = {h_stat:.1f}, p = {p_value:.3f}, "
+        f"epsilon squared = {epsilon_squared:.2f}"
+    )
+    print(f"Shapiro-Wilk (residuals): W = {w_stat:.3f}, p = {p_shapiro:.3g}")
+
+    # Fold difference in product between the taxa with the highest and the lowest
+    # mean efficiency after the minimum and maximum number of second-step PCR
+    # cycles (45 total cycles minus 20 and 6 first-step cycles = 25 and 39)
+    means = wells.groupby("Taxon")["E"].mean()
+    ratio = means.max() / means.min()
+    print(
+        f"Mean E {means.idxmax()} / {means.idxmin()} = {ratio:.4f}; difference of means "
+        f"{means.max() - means.min():.3f}; fold difference after 25 cycles: "
+        f"{ratio**25:.2f}, after 39 cycles: {ratio**39:.2f}"
+    )
+
+
+def read_primer_binding_sites(supporting_information_3: Path) -> tuple:
+    """Return the fwh2 primers, the IUPAC code table and the template binding sites.
+
+    The Sanger consensus sequences of the single specimens (Supporting
+    Information 3) are the fwh2 amplicons including both primer binding sites:
+    the first 26 nucleotides are the binding site of the forward primer fwhF2,
+    the last 23 nucleotides (reverse complement) the binding site of the reverse
+    primer fwhR2n. For each taxon the most frequent site among the specimens is
+    used. The sites are returned in primer sense, keyed by (taxon, primer name).
+    """
+    primers = {
+        "fwhF2": "GGDACWGGWTGAACWGTWTAYCCHCC",
+        "fwhR2n": "GTRATWGCHCCDGCTARWACWGG",
+    }
+    iupac = {
+        "A": "A", "C": "C", "G": "G", "T": "T", "R": "AG", "Y": "CT", "W": "AT",
+        "S": "CG", "K": "GT", "M": "AC", "D": "AGT", "H": "ACT", "B": "CGT",
+        "V": "ACG", "N": "ACGT",
+    }
+    complement = str.maketrans("ACGT", "TGCA")
+
+    # --- Read the consensus sequences (header: >Taxon_nn specimen=... length=...) ---
+    consensus = {taxon: [] for taxon in ORDER_NAMES}
+    with open(supporting_information_3) as fasta:
+        for line in fasta:
+            line = line.strip()
+            if line.startswith(">"):
+                taxon = line[1:].split("_")[0]
+                consensus[taxon].append("")
+            elif line:
+                consensus[taxon][-1] += line.upper()
+
+    # --- Binding site per taxon: most frequent site among the specimens ---
+    sites = {}
+    for taxon, seqs in consensus.items():
+        sites[(taxon, "fwhF2")] = pd.Series([s[:26] for s in seqs]).mode()[0]
+        sites[(taxon, "fwhR2n")] = pd.Series(
+            [s[-23:][::-1].translate(complement) for s in seqs]
+        ).mode()[0]
+    return primers, iupac, sites
+
+
+def supporting_information_29(supporting_information_3: Path) -> None:
+    """Create the primer binding site alignment (Supporting Information 29).
+
+    The Sanger consensus sequences of the single specimens (Supporting
+    Information 3) are the fwh2 amplicons including both primer binding sites:
+    the first 26 nucleotides are the binding site of the forward primer fwhF2,
+    the last 23 nucleotides (reverse complement) the binding site of the reverse
+    primer fwhR2n. For each taxon the most frequent site is aligned to the
+    degenerate primer. Each position is shaded by the share of the 288 primer
+    variants that match the template base: all (no shading), 1/2 or 1/3
+    (degenerate position), none (the base is not covered by any variant). The
+    last five nucleotides at the 3' end are marked.
+    """
+    primers, iupac, sites = read_primer_binding_sites(supporting_information_3)
+    shades = {"half": "#fdd49e", "third": "#fc8d59", "none": "#d62728"}
+
+    def cell_shade(code, base):
+        """Fill colour of a cell: None if all primer variants match the base."""
+        if base not in iupac[code]:
+            return shades["none"]
+        n_bases = len(iupac[code])
+        return None if n_bases == 1 else shades["half"] if n_bases == 2 else shades["third"]
+
+    fig, axes = plt.subplots(2, 1, figsize=(7.4, 6.4))
+    for ax, (panel, (primer_name, primer)) in zip(axes, zip("AB", primers.items())):
+        length = len(primer)
+        ax.set_xlim(-5.6, length + 0.3)
+        ax.set_ylim(-(len(ORDER_NAMES) + 1.2), 1.4)
+        ax.axis("off")
+        ax.set_title(f"{panel})  {primer_name}  (5' → 3')", loc="left", fontsize=10)
+
+        # primer row (degenerate positions in bold) with position numbers
+        for i, code in enumerate(primer):
+            ax.text(
+                i + 0.5, 0, code, ha="center", va="center", family="monospace",
+                fontsize=9, fontweight="bold",
+                color="0.1" if len(iupac[code]) > 1 else "0.45",
+            )
+            if (i + 1) % 5 == 0 or i == 0:
+                ax.text(i + 0.5, 0.95, str(i + 1), ha="center", va="center", fontsize=6.5, color="0.4")
+        ax.text(-0.3, 0, "Primer", ha="right", va="center", fontsize=8, fontweight="bold")
+
+        # one row per taxon
+        for row, taxon in enumerate(ORDER_NAMES, start=1):
+            y = -row
+            ax.text(
+                -0.3, y, taxon, ha="right", va="center", fontsize=8,
+                color=ORDER_PALETTE[taxon], fontweight="bold",
+            )
+            for i, base in enumerate(sites[(taxon, primer_name)]):
+                fill = cell_shade(primer[i], base)
+                if fill:
+                    ax.add_patch(plt.Rectangle((i, y - 0.42), 1, 0.84, facecolor=fill, lw=0))
+                ax.text(
+                    i + 0.5, y, base, ha="center", va="center", family="monospace",
+                    fontsize=9, color="white" if fill == shades["none"] else "0.15",
+                )
+
+        # bracket below the last five nucleotides (3' end)
+        ax.plot([length - 5, length], [-(len(ORDER_NAMES) + 0.75)] * 2, color="0.3", lw=1.2)
+        ax.text(
+            length - 2.5, -(len(ORDER_NAMES) + 1.15), "3' end (last 5 nt)",
+            ha="center", va="center", fontsize=7, color="0.3",
+        )
+
+    # Legend in two columns, read row by row: all / 1/2 and 1/3 / none
+    # (matplotlib fills legend columns first, hence the order of the handles)
+    fig.legend(
+        handles=[
+            mpatches.Patch(facecolor="white", edgecolor="0.6", label="all variants\nmatch"),
+            mpatches.Patch(facecolor=shades["third"], label="degenerate position:\n1/3 of variants match"),
+            mpatches.Patch(facecolor=shades["half"], label="degenerate position:\n1/2 of variants match"),
+            mpatches.Patch(facecolor=shades["none"], label="no variant\nmatches"),
+        ],
+        loc="lower center", ncol=2, fontsize=7.5, frameon=False,
+        bbox_to_anchor=(0.5, 0.0), columnspacing=2.5, handlelength=1.6,
+        handletextpad=0.6, labelspacing=0.8,
+    )
+    plt.tight_layout(rect=(0, 0.1, 1, 1))
+    plt.savefig(SI_DIR / "supporting information 29.pdf")
+    plt.savefig(SI_DIR / "supporting information 29.png", dpi=300)
+    plt.close(fig)
+
+
+def supporting_information_30(supporting_information_3: Path) -> None:
+    """Create the mismatch table of the primer variants (Supporting Information 30).
+
+    All 288 variants of each degenerate fwh2 primer are generated from the IUPAC
+    codes and compared position by position with the template binding site of
+    each taxon (Supporting Information 3). For each taxon and primer the table
+    lists how many variants have 0, 1, 2, ... mismatches, followed by the minimum,
+    the maximum and the mean number of mismatches per variant. All variants are
+    treated as equally frequent.
+    """
+    primers, iupac, sites = read_primer_binding_sites(supporting_information_3)
+
+    rows = []
+    for taxon in ORDER_NAMES:
+        for primer_name, primer in primers.items():
+            site = sites[(taxon, primer_name)]
+            variants = ["".join(v) for v in itertools.product(*[iupac[c] for c in primer])]
+            mismatches = pd.Series(
+                [sum(a != b for a, b in zip(variant, site)) for variant in variants]
+            )
+            row = {"Taxon": taxon, "Primer": primer_name}
+            row["_counts"] = mismatches.value_counts().to_dict()
+            row["Min"] = mismatches.min()
+            row["Max"] = mismatches.max()
+            row["Mean"] = round(mismatches.mean(), 1)
+            rows.append(row)
+
+    # one column per number of mismatches, up to the highest number observed
+    max_mismatches = max(max(row["_counts"]) for row in rows)
+    table = pd.DataFrame(
+        {
+            "Taxon": [row["Taxon"] for row in rows],
+            "Primer": [row["Primer"] for row in rows],
+            **{
+                str(n): [row["_counts"].get(n, 0) for row in rows]
+                for n in range(max_mismatches + 1)
+            },
+            "Min": [row["Min"] for row in rows],
+            "Max": [row["Max"] for row in rows],
+            "Mean": [row["Mean"] for row in rows],
+        }
+    )
+    table.to_excel(SI_DIR / "supporting information 30.xlsx", index=False)
+    print(table.to_string(index=False))
+
+
+def primer_variant_histogram(
+    supporting_information_15: Path,
+    supporting_information_3: Path,
+    full_results: pd.DataFrame,
+) -> tuple:
+    """Count the reads of the incorporated primer variants by their number of mismatches.
+
+    Reads the primer counts (Supporting Information 15), keeps the taxa that are
+    expected in a community (Supporting Information 14) and drops reads whose
+    primer region matches none of the 288 variants. Each variant is compared with
+    the template binding site of its taxon (Supporting Information 3). Aliquots
+    and communities are pooled by summing reads. Returns the histogram (reads and
+    fraction of reads per taxon, primer, number of first-step cycles and number
+    of mismatches), the counts per variant, the primers, the IUPAC table and the
+    template binding sites.
+    """
+    primers, iupac, sites = read_primer_binding_sites(supporting_information_3)
+    primer_keys = {"forward": "fwhF2", "reverse": "fwhR2n"}
+
+    # --- Counts of the taxa expected in each community, without unmatched reads ---
+    counts = pd.read_parquet(supporting_information_15)
+    expected = full_results.loc[full_results["primer"] == "fwh2", ["sample", "order"]]
+    expected = expected.drop_duplicates().rename(columns={"order": "taxon"})
+    counts = counts.merge(expected, on=["sample", "taxon"], how="inner")
+    counts = counts[counts["variant"] != "other"]
+
+    # --- Mismatches of every variant to the template site of its taxon ---
+    variants = counts[["taxon", "primer", "variant"]].drop_duplicates()
+    variants["mismatches"] = [
+        sum(a != b for a, b in zip(variant, sites[(taxon, primer_keys[primer])]))
+        for taxon, primer, variant in zip(
+            variants["taxon"], variants["primer"], variants["variant"]
+        )
+    ]
+    counts = counts.merge(variants, on=["taxon", "primer", "variant"])
+    histogram = (
+        counts.groupby(["taxon", "primer", "cycles", "mismatches"])["reads"].sum().reset_index()
+    )
+    histogram["fraction"] = histogram["reads"] / histogram.groupby(
+        ["taxon", "primer", "cycles"]
+    )["reads"].transform("sum")
+    return histogram, counts, primers, iupac, sites
+
+
+def primer_variant_trend(
+    supporting_information_15: Path,
+    supporting_information_3: Path,
+    full_results: pd.DataFrame,
+) -> pd.DataFrame:
+    """Test whether the mismatches of the incorporated variants rise with the cycle number.
+
+    A series is one taxon in one community (aliquots pooled) and one primer. For
+    each series the mean number of mismatches of the incorporated variants,
+    weighted by read count, is calculated per number of first-step cycles and
+    related to the cycle number with Spearman's rank correlation. The summary
+    quoted in the results (number of series, share with a positive correlation,
+    median and range of the correlation coefficient) is printed.
+    """
+    _, counts, _, _, _ = primer_variant_histogram(
+        supporting_information_15, supporting_information_3, full_results
+    )
+    counts = counts.assign(weighted=counts["reads"] * counts["mismatches"])
+    per_cycle = (
+        counts.groupby(["sample", "taxon", "primer", "cycles"])[["weighted", "reads"]]
+        .sum()
+        .reset_index()
+    )
+    per_cycle["mean_mismatches"] = per_cycle["weighted"] / per_cycle["reads"]
+
+    rows = []
+    for (sample, taxon, primer), series in per_cycle.groupby(["sample", "taxon", "primer"]):
+        rho, p_value = spearmanr(series["cycles"], series["mean_mismatches"])
+        rows.append((sample, taxon, primer, len(series), rho, p_value))
+    trend = pd.DataFrame(
+        rows, columns=["sample", "taxon", "primer", "cycle numbers", "rho", "p"]
+    )
+
+    print(
+        f"{len(trend)} series; rho > 0 in {(trend['rho'] > 0).sum()} "
+        f"({(trend['rho'] > 0).mean():.1%}); median rho = {trend['rho'].median():.2f} "
+        f"(range {trend['rho'].min():.2f} to {trend['rho'].max():.2f}); "
+        f"p < 0.05 in {(trend['p'] < 0.05).sum()} ({(trend['p'] < 0.05).mean():.1%})"
+    )
+    return trend
+
+
+def figure_5(
+    supporting_information_15: Path,
+    supporting_information_3: Path,
+    full_results: pd.DataFrame,
+) -> None:
+    """Create Figure 5: replacement of the primer binding site in Lepidoptera.
+
+    For Lepidoptera, the fraction of reads per number of mismatches between the
+    incorporated primer variant and the template site is shown for the fwhF2 and
+    fwhR2n primers after 6 to 20 cycles of the first PCR step. After few cycles,
+    variants with few mismatches to the original site dominate; with more cycles
+    the distribution approaches the one expected if all 288 primer variants were
+    equally frequent (dashed line). The data are the same as in Supporting
+    Information 31, where all taxa are shown.
+    """
+    histogram, counts, primers, iupac, sites = primer_variant_histogram(
+        supporting_information_15, supporting_information_3, full_results
+    )
+    taxon = "Lepidoptera"
+    panels = [("forward", "fwhF2", "A"), ("reverse", "fwhR2n", "B")]
+    cycle_numbers = sorted(histogram["cycles"].unique())
+    cycle_colors = plt.cm.viridis(np.linspace(0, 0.95, len(cycle_numbers)))
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.2), sharey=True)
+    for ax, (primer, primer_name, panel) in zip(axes, panels):
+        # expectation: all 288 primer variants equally frequent
+        all_variants = [
+            "".join(v) for v in itertools.product(*[iupac[c] for c in primers[primer_name]])
+        ]
+        site = sites[(taxon, primer_name)]
+        pool = pd.Series(
+            [sum(a != b for a, b in zip(v, site)) for v in all_variants]
+        ).value_counts(normalize=True).sort_index()
+        mismatch_values = np.arange(0, pool.index.max() + 1)
+
+        for cycles, color in zip(cycle_numbers, cycle_colors):
+            subset = histogram[
+                (histogram["taxon"] == taxon)
+                & (histogram["primer"] == primer)
+                & (histogram["cycles"] == cycles)
+            ].set_index("mismatches")["fraction"]
+            ax.plot(
+                mismatch_values,
+                subset.reindex(mismatch_values, fill_value=0).values,
+                color=color, lw=1.6, marker="o", ms=3, label=f"c = {cycles}",
+            )
+        ax.plot(
+            mismatch_values,
+            pool.reindex(mismatch_values, fill_value=0).values,
+            color="black", ls="--", lw=1.3, label="all 288 variants equally frequent",
+        )
+        ax.set_title(f"{panel}) {primer_name}", fontsize=12)
+        ax.set_xticks(mismatch_values)
+        ax.set_xlabel("Mismatches of the incorporated variant to the template site")
+        sns.despine(ax=ax)
+    axes[0].set_ylabel("Fraction of reads")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(
+        handles, labels, loc="lower center", ncol=5, fontsize=8, frameon=False,
+        bbox_to_anchor=(0.5, -0.13),
+    )
+
+    plt.tight_layout()
+    plt.savefig(FIGURES_DIR / "figure 5.pdf", dpi=300, bbox_inches="tight")
+    plt.savefig(FIGURES_DIR / "figure 5.png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+def supporting_information_31(
+    supporting_information_15: Path,
+    supporting_information_3: Path,
+    full_results: pd.DataFrame,
+) -> None:
+    """Create the histograms of the incorporated primer variants (Supporting Information 31).
+
+    The primer counts (Supporting Information 15) give, per sample, aliquot, number
+    of first-step cycles, taxon and primer, how many reads carry each of the 288
+    primer variants. Each variant is compared with the template binding site of
+    its taxon (Supporting Information 3) and counted as its number of
+    mismatches. Only taxa expected in a community (Supporting Information 14) are
+    used, and aliquots and communities are pooled by summing reads. For every
+    taxon and primer, one line per number of first-step cycles shows the fraction
+    of reads per number of mismatches; the dashed line is the expectation if all
+    288 primer variants were equally frequent. Lines end at the highest number of
+    mismatches that is possible for the taxon and primer.
+    """
+    histogram, counts, primers, iupac, sites = primer_variant_histogram(
+        supporting_information_15, supporting_information_3, full_results
+    )
+    primer_keys = {"forward": "fwhF2", "reverse": "fwhR2n"}
+
+    cycle_numbers = sorted(histogram["cycles"].unique())
+    cycle_colors = plt.cm.viridis(np.linspace(0, 0.95, len(cycle_numbers)))
+
+    fig, axes = plt.subplots(
+        len(ORDER_NAMES), 2, figsize=(9, 11.6), sharey=True
+    )
+    max_mismatches = {"forward": 0, "reverse": 0}
+    for i, taxon in enumerate(ORDER_NAMES):
+        for j, primer in enumerate(["forward", "reverse"]):
+            ax = axes[i, j]
+            primer_name = primer_keys[primer]
+
+            # expectation: all 288 primer variants equally frequent
+            all_variants = [
+                "".join(v) for v in itertools.product(*[iupac[c] for c in primers[primer_name]])
+            ]
+            site = sites[(taxon, primer_name)]
+            pool = pd.Series(
+                [sum(a != b for a, b in zip(v, site)) for v in all_variants]
+            ).value_counts(normalize=True).sort_index()
+            mismatch_values = np.arange(0, pool.index.max() + 1)
+            max_mismatches[primer] = max(max_mismatches[primer], pool.index.max())
+
+            for cycles, color in zip(cycle_numbers, cycle_colors):
+                subset = histogram[
+                    (histogram["taxon"] == taxon)
+                    & (histogram["primer"] == primer)
+                    & (histogram["cycles"] == cycles)
+                ].set_index("mismatches")["fraction"]
+                ax.plot(
+                    mismatch_values,
+                    subset.reindex(mismatch_values, fill_value=0).values,
+                    color=color, lw=1.6, marker="o", ms=3, label=f"c = {cycles}",
+                )
+            ax.plot(
+                mismatch_values,
+                pool.reindex(mismatch_values, fill_value=0).values,
+                color="black", ls="--", lw=1.3, label="all 288 variants equally frequent",
+            )
+            n_reads = int(
+                counts.loc[(counts["taxon"] == taxon) & (counts["primer"] == primer), "reads"].sum()
+            )
+            ax.set_title(
+                f"{taxon}, {primer_name} (n = {n_reads:,} reads)",
+                fontsize=9, loc="left", color=ORDER_PALETTE[taxon], fontweight="bold",
+            )
+            sns.despine(ax=ax)
+
+    # same x-axis within a column: 0 up to the highest possible number of mismatches
+    for j, primer in enumerate(["forward", "reverse"]):
+        for ax in axes[:, j]:
+            ax.set_xticks(range(max_mismatches[primer] + 1))
+            ax.set_xlim(-0.5, max_mismatches[primer] + 0.5)
+    for ax in axes[:, 0]:
+        ax.set_ylabel("Fraction of reads")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(
+        handles, labels, loc="lower center", ncol=5, fontsize=8, frameon=False,
+        bbox_to_anchor=(0.5, 0.0),
+    )
+    fig.supxlabel(
+        "Mismatches of the incorporated variant to the template site", y=0.052, fontsize=10
+    )
+
+    plt.tight_layout(rect=(0, 0.075, 1, 1))
+    plt.savefig(SI_DIR / "supporting information 31.pdf")
+    plt.savefig(SI_DIR / "supporting information 31.png", dpi=200)
+    plt.close(fig)
+
+
+def supporting_information_32(
+    supporting_information_11: Path,
+    supporting_information_27: Path,
+    full_results: pd.DataFrame,
+) -> None:
+    """Create the GC content table of the amplicons (Supporting Information 32).
+
+    The sequences of Supporting Information 11 are primer-trimmed. For each taxon
+    and primer pair (fwh2: all numbers of first-step cycles; BF3: 20 cycles) the
+    GC content of a sequence is (G + C) / length. The table gives the number of
+    sequences, the length of the most abundant sequence, the mean GC content
+    weighted by the read count of each sequence, and the lowest and highest GC
+    content. The relative amplification efficiency of the constant bias model
+    (Supporting Information 27, Blattodea = 1) is added for comparison. Only taxa
+    expected in a community (Supporting Information 14) are used.
+    """
+    reads = pd.read_parquet(
+        supporting_information_11,
+        columns=["sample", "primer", "order", "sequence", "read_count"],
+    )
+    expected = full_results[["sample", "primer", "order"]].drop_duplicates()
+    reads = reads.merge(expected, on=["sample", "primer", "order"])
+
+    # reads of a sequence summed over samples, aliquots and cycle numbers
+    unique_sequences = reads.groupby(["primer", "order", "sequence"], as_index=False)["read_count"].sum()
+    unique_sequences["gc"] = (
+        100 * unique_sequences["sequence"].str.count("[GC]") / unique_sequences["sequence"].str.len()
+    )
+
+    efficiencies = pd.read_excel(supporting_information_27).set_index("order")
+    efficiency_columns = {
+        "fwh2": "E_i fwh2 (constant bias model)",
+        "bf3": "E_i BF3 (constant bias model)",
+    }
+
+    rows = []
+    for taxon in ORDER_NAMES:
+        for primer, label in [("fwh2", "fwh2"), ("bf3", "BF3")]:
+            group = unique_sequences[
+                (unique_sequences["primer"] == primer) & (unique_sequences["order"] == taxon)
+            ]
+            weights = group["read_count"] / group["read_count"].sum()
+            most_abundant = group.sort_values("read_count", ascending=False).iloc[0]
+            rows.append(
+                {
+                    "Taxon": taxon,
+                    "Primer pair": label,
+                    "Sequences (n)": len(group),
+                    "Length (nt)": len(most_abundant["sequence"]),
+                    "GC content, read-weighted mean (%)": round((group["gc"] * weights).sum(), 1),
+                    "GC content, lowest (%)": round(group["gc"].min(), 1),
+                    "GC content, highest (%)": round(group["gc"].max(), 1),
+                    "Relative E, constant bias model": efficiencies.loc[taxon, efficiency_columns[primer]],
+                }
+            )
+    table = pd.DataFrame(rows)
+    table.to_excel(SI_DIR / "supporting information 32.xlsx", index=False)
+    print(table.to_string(index=False))
 
 
 def main():
     """Run the complete analysis from raw data files to all figures and tables.
 
-    This function orchestrates the entire study in seven steps:
+    This function orchestrates the entire study in nine steps:
 
-    Step 1 — qPCR primer validation (Supporting Information 4):
-        Each primer pair was tested against all five insect orders in single-species
-        reactions. The results are shown as a heatmap confirming that fwh2 and BF3
-        amplify all five orders (Supporting Information 4).
+    Step 1 — qPCR assay validation (Supporting Information 6):
+        Taxon-specific qPCR assays were used to check whether each target insect
+        order was detectable in each community sample (both extraction replicates).
+        The results are shown as a heatmap of true/false positives and negatives
+        (Supporting Information 6). Input: Supporting Information 5.
 
-    Step 2 — Metabarcoding data processing (Supporting Information 7, 9, 11, 12, 14):
-        Raw sequencing reads are loaded and tallied per sample, PCR cycle count,
-        insect order, and primer pair. Reads are converted to proportions (relative
-        reads) so that samples with different total read counts are comparable.
-        Two aliquots were sequenced per sample as a reproducibility check; their
-        proportions are compared with a Wilcoxon signed-rank test. Aliquots are
-        then pooled by averaging.
+    Step 2 — Metabarcoding data processing (Supporting Information 12):
+        Raw sequencing reads (Supporting Information 11) are summed over sequencing
+        lanes per sample, aliquot, PCR cycle count, insect order, and primer pair.
+        Reads of non-target taxa and of samples 26, 92 and 93 (not part of the
+        controlled experiment) are removed. Reads are converted to proportions
+        (relative reads) so that samples with different total read counts are
+        comparable. Two aliquots were sequenced per sample as a reproducibility
+        check; their proportions are compared with a Wilcoxon signed-rank test
+        (Supporting Information 12). Aliquots are then pooled by summing reads,
+        which weights the pooled proportion by sequencing depth.
 
-    Step 3 — ddPCR data processing (Supporting Information 8):
-        Digital droplet PCR gives absolute copy numbers per insect taxon. Technical
-        replicates are checked for consistency (Wilcoxon test) and then averaged
-        to obtain one copy number per (sample, order, primer).
+    Step 3 — ddPCR data processing (Supporting Information 13):
+        Digital droplet PCR gives absolute mtDNA copy numbers per insect taxon
+        (Supporting Information 8). The two replicates are checked for consistency
+        (Wilcoxon test, Supporting Information 13) and then averaged to obtain one
+        copy number per (sample, order).
 
     Step 4 — Merge all measurements:
-        Metabarcoding reads, ddPCR copy numbers, and known biomass proportions are
-        joined into one unified table. This combined table (Supporting Information 9)
-        is the basis for all downstream analyses.
+        Metabarcoding reads, ddPCR copy numbers, and known biomass proportions
+        (Supporting Information 1) are joined into one unified table. This
+        combined table (Supporting Information 14) is the basis for all downstream
+        analyses.
 
-    Step 5 — Fold-change and rank analysis (Figure 2, Table 1, Supporting Information 11):
+    Step 5 — Fold-change and rank analysis (Figure 2, Table 1, Supporting
+    Information 17, 18, 19, and 20):
         For each taxon and sample we compute how far reads deviate from copy numbers
         and from biomass (log2 fold-change). We also check whether the rank order
         of taxa by reads agrees with the rank order by copies (rank concordance).
         Figure 2 shows the fold-change distributions; Table 1 summarises rank
-        concordance; Supporting Information 11 counts over- and underrepresentation
-        by order.
+        concordance; Supporting Information 17 counts over- and underrepresentation
+        by order. Supporting Information 18 (fwh2) and 19 (BF3) show the per-sample
+        community composition at c=20; Supporting Information 20 shows how the
+        read proportions change across PCR cycle counts (fwh2).
 
-    Step 6 — Model comparison (Figure 4, Table 2, Supporting Information 18, 19, 20, 21, and 22):
+    Step 6 — Model comparison (Figure 3, Figure 4, Table 2, Supporting
+    Information 24, 25, 26, 27, and 28):
         Four approaches to predicting taxon proportions from reads are compared:
           1. No correction: use reads directly as a proxy for copies.
-          2. Cycle calibration (Shelton et al. 2023): fit a per-cycle decay model
-             within each community using reads measured at multiple cycle counts.
+          2. Cycle calibration (Shelton et al. 2023): regress the log-ratio of
+             read counts against cycle number within each community, using reads
+             measured at multiple cycle counts; the intercept estimates the
+             starting copy ratio.
           3. Cycle-dependent bias model: estimate a per-cycle amplification
              efficiency factor E_i from 14 two-species calibration communities;
              apply as reads / E_i^c, then renormalise.
@@ -1866,42 +2520,82 @@ def main():
              efficiency factor E_i (the odds ratio at c=20) from the same 14
              calibration communities; apply as reads / E_i, then renormalise.
         Approaches 3 and 4 are evaluated only on the 67 communities that were
-        not used for calibration (out-of-sample test).
+        not used for calibration (out-of-sample test). Figure 3 compares
+        approaches 1 and 2 on all 81 communities; Figure 4 and Supporting
+        Information 24 and 26 compare approaches 3 and 4 (fwh2). Table 2 and
+        Supporting Information 27 list the E_i values; Supporting Information 25
+        extends Supporting Information 21 with E_i, bias model predictions and
+        Aitchison distances. Supporting Information 28 repeats the constant bias
+        model for BF3 (c=20 only).
 
-    Step 7 — Supporting Information 15:
-        The cycle calibration predictions (Supporting Information 15) are exported
-        as an extended version of Supporting Information 9. BF3 rows have no cycle
-        calibration values because that method requires data at multiple cycle counts,
-        and BF3 was only sequenced at c=20.
+    Step 7 — Export of results (Supporting Information 14, 17, 21; Table 1):
+        The merged table (Supporting Information 14), rank concordance (Table 1),
+        and over-/underrepresentation counts (Supporting Information 17) are
+        written to Excel. The cycle calibration predictions (Supporting
+        Information 21) are exported as an extended version of Supporting
+        Information 14. BF3 rows have no cycle calibration values because that
+        method requires data at multiple cycle counts, and BF3 was only sequenced
+        at c=20.
+
+    Step 8 — Second-step PCR (Supporting Information 9_1 and 9_2):
+        The qPCR raw data and per-well efficiencies of the second-step PCR
+        (Supporting Information 10) are summarised in a figure (amplification
+        curves and efficiencies per taxon, Supporting Information 9_1) and a table
+        (mean, minimum and maximum efficiency per taxon, Supporting Information
+        9_2). The statistics quoted in the text (Kruskal-Wallis test, Shapiro-Wilk
+        test, fold differences) are printed.
+
+    Step 9 — In silico primer analysis (Supporting Information 29, 30, 31, 32;
+    Figure 5):
+        The binding sites of the fwh2 primers are read from the Sanger consensus
+        sequences (Supporting Information 3). They are shown aligned to the
+        degenerate primers (Supporting Information 29), and the mismatches of all
+        288 primer variants are tabulated (Supporting Information 30). The counts
+        of the incorporated primer variants (Supporting Information 15) are shown
+        as histograms of the number of mismatches per number of first-step cycles
+        for all taxa (Supporting Information 31) and for Lepidoptera (Figure 5);
+        the Spearman correlation of the mean number of mismatches with the cycle
+        number per series is printed. The GC content of the amplicons per taxon
+        and primer pair is exported together with the relative efficiencies of the
+        constant bias model (Supporting Information 32).
     """
     # --- Input files ---
     supporting_information_1 = (
         SI_DIR / "supporting information 1.xlsx"
     )  # community compositions + biomass
-    supporting_information_2 = (
-        SI_DIR / "supporting information 2.xlsx"
+    supporting_information_4 = (
+        SI_DIR / "supporting information 4.xlsx"
     )  # ddPCR primer/probe sequences
-    supporting_information_3 = (
-        SI_DIR / "supporting information 3.xlsx"
-    )  # qPCR validation data
     supporting_information_5 = (
         SI_DIR / "supporting information 5.xlsx"
+    )  # qPCR validation data
+    supporting_information_8 = (
+        SI_DIR / "supporting information 8.xlsx"
     )  # ddPCR raw copy numbers
-    supporting_information_6 = (
-        SI_DIR / "supporting information 6.parquet.snappy"
+    supporting_information_11 = (
+        SI_DIR / "supporting information 11.parquet.snappy"
     )  # metabarcoding raw reads
+    supporting_information_10 = (
+        SI_DIR / "supporting information 10.xlsx"
+    )  # qPCR raw data + efficiencies, second-step PCR
+    supporting_information_3 = (
+        SI_DIR / "supporting information 3.fasta"
+    )  # Sanger consensus sequences of the single specimens
+    supporting_information_15 = (
+        SI_DIR / "supporting information 15.parquet.snappy"
+    )  # primer variant counts per taxon, sample, aliquot and cycles
 
     # --- Step 1: qPCR primer validation heatmap ---
-    supporting_information_4(supporting_information_3)
+    supporting_information_6(supporting_information_5)
 
     # --- Step 2: Metabarcoding data processing ---
     aggregated_read_data = aggregate_metabarcoding_data(
-        supporting_information_1, supporting_information_6
+        supporting_information_1, supporting_information_11
     )
     relative_read_data = absolute_reads_to_relative_reads(aggregated_read_data)
 
     # --- Step 3: ddPCR data processing ---
-    ddpcr_data = aggregate_ddpcr_data(supporting_information_5)
+    ddpcr_data = aggregate_ddpcr_data(supporting_information_8)
 
     # --- Step 4: Merge all data sources ---
     full_results = final_aggregation(
@@ -1914,50 +2608,38 @@ def main():
         full_results, primer="fwh2", cycles=20, filename=str(FIGURES_DIR / "figure 2.pdf")
     )
 
-    # --- Step 6: Model comparison (Figure 4, Table 2, SI 15, SI 16) ---
+    # --- Step 6: Model comparison (Figure 3, Figure 4, Table 2, SI 24-28) ---
     predict_copies_model_comparison(full_results)
 
     # --- Step 7: Export full results and additional figures ---
 
-    # Supporting Information 9: the merged table with all measurements
-    full_results.to_excel(SI_DIR / "supporting information 9.xlsx", index=False)
+    # Supporting Information 14: the merged table with all measurements
+    full_results.to_excel(SI_DIR / "supporting information 14.xlsx", index=False)
 
     # Table 1: rank concordance counts (fwh2 and BF3 side by side)
-    export_table1_rank_concordance(
-        full_results, filename=str(TABLES_DIR / "table 1.xlsx")
-    )
+    export_table1_rank_concordance(full_results, filename=str(TABLES_DIR / "table 1.xlsx"))
 
-    # Supporting Information 11: over/concordant/underrepresentation by order
+    # Supporting Information 17: over/concordant/underrepresentation by order
     #   Sheet 1 — Biomass vs Copies  (method-independent; one table)
     #   Sheet 2 — Copies vs Reads    (fwh2 and BF3 side by side)
     #   Sheet 3 — Biomass vs Reads   (fwh2 and BF3 side by side)
-    export_si11_over_under(
-        full_results, filename=str(SI_DIR / "supporting information 11.xlsx")
-    )
+    export_si11_over_under(full_results, filename=str(SI_DIR / "supporting information 17.xlsx"))
 
-    # Supporting Information 12 & 12: stacked barplots of community composition
-    # at c=20 for fwh2 (SI 11) and BF3 (SI 12)
+    # Supporting Information 18 & 19: stacked barplots of community composition
+    # at c=20 for fwh2 (SI 18) and BF3 (SI 19)
     plot_stacked_barplots(
-        full_results,
-        primer="fwh2",
-        cycles=20,
-        filename=str(SI_DIR / "supporting information 12.pdf"),
+        full_results, primer="fwh2", cycles=20, filename=str(SI_DIR / "supporting information 18.pdf")
     )
     plot_stacked_barplots(
-        full_results,
-        primer="bf3",
-        cycles=20,
-        filename=str(SI_DIR / "supporting information 13.pdf"),
+        full_results, primer="bf3", cycles=20, filename=str(SI_DIR / "supporting information 19.pdf")
     )
 
-    # Supporting Information 14: how read proportions change across cycle counts
+    # Supporting Information 20: how read proportions change across cycle counts
     plot_reads_per_cycle(
-        full_results,
-        primer="fwh2",
-        filename=str(SI_DIR / "supporting information 14.pdf"),
+        full_results, primer="fwh2", filename=str(SI_DIR / "supporting information 20.pdf")
     )
 
-    # Supporting Information 15: cycle calibration table (fwh2 only).
+    # Supporting Information 21: cycle calibration table (fwh2 only).
     # BF3 rows are kept but their cycle-calibration columns are left blank
     # because cycle calibration requires data at multiple cycle counts,
     # and BF3 was only run at c=20.
@@ -1966,8 +2648,34 @@ def main():
     cycle_cal_export = full_results.merge(
         cycle_cal_table, on=["sample", "order", "primer"], how="left"
     )
-    cycle_cal_export.to_excel(
-        SI_DIR / "supporting information 15.xlsx", index=False
+    cycle_cal_export.to_excel(SI_DIR / "supporting information 21.xlsx", index=False)
+
+    # --- Step 8: second-step PCR, qPCR efficiencies (SI 9_1, SI 9_2) ---
+    supporting_information_9_1(supporting_information_10)
+    supporting_information_9_2(supporting_information_10)
+
+    # --- Step 9: in silico primer analysis ---
+    # primer binding site alignment (SI 29) and mismatch table (SI 30)
+    supporting_information_29(supporting_information_3)
+    supporting_information_30(supporting_information_3)
+
+    # histograms of the incorporated primer variants (SI 31)
+    supporting_information_31(
+        supporting_information_15, supporting_information_3, full_results
+    )
+
+    # Figure 5: replacement of the primer binding site (Lepidoptera)
+    figure_5(supporting_information_15, supporting_information_3, full_results)
+
+    # GC content of the amplicons (SI 32)
+    supporting_information_32(
+        supporting_information_11, (SI_DIR / "supporting information 27.xlsx"), full_results
+    )
+
+    # Spearman correlation of the mean mismatches with the cycle number per series
+    # (the summary quoted in the results is printed)
+    primer_variant_trend(
+        supporting_information_15, supporting_information_3, full_results
     )
 
 
