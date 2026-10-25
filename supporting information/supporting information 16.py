@@ -365,42 +365,42 @@ def plot_aliquot_consistency(aggregated_read_data: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-def aggregate_ddpcr_data(supporting_information_8: Path) -> pd.DataFrame:
-    """Load ddPCR copy number data, verify replicate agreement, and pool replicates.
+def aggregate_dpcr_data(supporting_information_8: Path) -> pd.DataFrame:
+    """Load dPCR copy number data, verify replicate agreement, and pool replicates.
 
-    Droplet digital PCR (ddPCR) gives an absolute count of mitochondrial DNA
+    Digital PCR (dPCR) gives an absolute count of mitochondrial DNA
     (mtDNA) copies per taxon in each sample. This function loads those raw
     counts (Supporting Information 8), converts them to relative proportions
     (each taxon's copies divided by total copies in that sample), and checks
-    whether two independent ddPCR replicates (A and B) agree using a Wilcoxon
+    whether two independent dPCR replicates (A and B) agree using a Wilcoxon
     signed-rank test. A scatter plot comparing the replicates is saved as
     Supporting Information 13. The two replicates are then averaged to obtain
     a single reliable copy-number estimate per sample and taxon.
     Returns the pooled copy-number table.
     """
-    # --- Load ddPCR data ---
-    ddpcr_data = pd.read_excel(supporting_information_8)
+    # --- Load dPCR data ---
+    dpcr_data = pd.read_excel(supporting_information_8)
 
     # --- Compute relative copy numbers per (sample, replicate) ---
     total_copies = (
-        ddpcr_data.groupby(by=["sample", "replicate"])
+        dpcr_data.groupby(by=["sample", "replicate"])
         .sum()["mtDNA copies"]
         .reset_index()
         .rename(columns={"mtDNA copies": "total copies"})
     )
 
-    ddpcr_data = ddpcr_data.merge(
+    dpcr_data = dpcr_data.merge(
         total_copies,
         how="left",
         on=["sample", "replicate"],
     )
 
-    ddpcr_data["relative copies"] = (
-        ddpcr_data["mtDNA copies"] / ddpcr_data["total copies"]
+    dpcr_data["relative copies"] = (
+        dpcr_data["mtDNA copies"] / dpcr_data["total copies"]
     )
 
     # --- Scatterplot: replicate A vs. replicate B (supporting information 13) ---
-    pivot = ddpcr_data.pivot_table(
+    pivot = dpcr_data.pivot_table(
         index=["sample", "order"],
         columns="replicate",
         values="relative copies",
@@ -433,40 +433,40 @@ def aggregate_ddpcr_data(supporting_information_8: Path) -> pd.DataFrame:
     paired = pivot.dropna(subset=["A", "B"])
     stat, p = wilcoxon(paired["A"], paired["B"])
     print(
-        f"\n=== ddPCR replicate consistency (Wilcoxon signed-rank test) ===\n"
+        f"\n=== dPCR replicate consistency (Wilcoxon signed-rank test) ===\n"
         f"  statistic={stat:.2f}, p={p:.4e}, n_pairs={len(paired)}"
     )
 
     # --- Pool replicates by averaging copy numbers per (sample, order) ---
     # Mean (not sum) to preserve the physical scale of copy numbers
-    ddpcr_data = (
-        ddpcr_data.groupby(by=["sample", "order"])
+    dpcr_data = (
+        dpcr_data.groupby(by=["sample", "order"])
         .mean(numeric_only=True)[["mtDNA copies"]]
         .reset_index()
     )
 
     # Recompute totals and relative proportions from pooled means
     total_copies = (
-        ddpcr_data.groupby("sample")["mtDNA copies"].sum().rename("total copies")
+        dpcr_data.groupby("sample")["mtDNA copies"].sum().rename("total copies")
     )
-    ddpcr_data = ddpcr_data.merge(total_copies, on="sample")
-    ddpcr_data["relative copies"] = (
-        ddpcr_data["mtDNA copies"] / ddpcr_data["total copies"]
+    dpcr_data = dpcr_data.merge(total_copies, on="sample")
+    dpcr_data["relative copies"] = (
+        dpcr_data["mtDNA copies"] / dpcr_data["total copies"]
     )
 
-    return ddpcr_data
+    return dpcr_data
 
 
 def final_aggregation(
     relative_read_data: pd.DataFrame,
-    ddpcr_data: pd.DataFrame,
+    dpcr_data: pd.DataFrame,
     supporting_information_1: Path,
 ) -> pd.DataFrame:
     """Combine the three data sources into one master table.
 
     This function brings together the three measurements collected for each
     taxon in each sample: relative metabarcoding reads (proportions of DNA
-    sequences), relative mtDNA copy numbers from ddPCR, and biomass from
+    sequences), relative mtDNA copy numbers from dPCR, and biomass from
     weighing. After merging, every row in the resulting table holds all three
     values for one taxon in one sample at one PCR cycle count.
     This master table (Supporting Information 14) is the basis for all
@@ -474,9 +474,9 @@ def final_aggregation(
     """
     supporting_information_1 = pd.read_excel(supporting_information_1)
 
-    # Merge reads ← ddPCR ← biomass on shared (sample, order) keys
+    # Merge reads ← dPCR ← biomass on shared (sample, order) keys
     full_results = relative_read_data.merge(
-        ddpcr_data, on=["sample", "order"], how="left"
+        dpcr_data, on=["sample", "order"], how="left"
     ).merge(supporting_information_1, on=["sample", "order"], how="left")
 
     full_results = full_results.sort_values(
@@ -1008,7 +1008,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
 
     The central question of this study: can we correct for amplification bias
     in metabarcoding data to obtain better estimates of true taxon abundances
-    (measured here as relative mtDNA copy numbers by ddPCR)?
+    (measured here as relative mtDNA copy numbers by dPCR)?
 
     Four approaches are compared:
       1. No correction — use raw read proportions as the abundance estimate.
@@ -1242,7 +1242,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.set_aspect("equal")
-        ax.set_xlabel("Observed relative copies (ddPCR)")
+        ax.set_xlabel("Observed relative copies (dPCR)")
         ax.set_title(figure3_titles[method_name], fontsize=13)
 
         obs_v, pred_v = md["obs"].values, md["pred"].values
@@ -1387,7 +1387,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.set_aspect("equal")
-        ax.set_xlabel("Observed relative copies (ddPCR)")
+        ax.set_xlabel("Observed relative copies (dPCR)")
         ax.set_title(title, fontsize=13)
 
         obs_v, pred_v = md["obs"].values, md["pred"].values
@@ -1557,7 +1557,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
             if row_idx == 0:
                 ax.set_title(col_title, fontsize=10)
             if row_idx == n_cyc - 1:
-                ax.set_xlabel("Observed relative copies (ddPCR)", fontsize=8)
+                ax.set_xlabel("Observed relative copies (dPCR)", fontsize=8)
             if col_idx == 0:
                 ax.set_ylabel("Predicted", fontsize=8)
                 ax.annotate(
@@ -1701,7 +1701,7 @@ def predict_copies_model_comparison(full_results: pd.DataFrame) -> None:
             if row_idx == 0:
                 ax.set_title(col_title, fontsize=10)
             if row_idx == n_ord - 1:
-                ax.set_xlabel("Observed relative copies (ddPCR)", fontsize=8)
+                ax.set_xlabel("Observed relative copies (dPCR)", fontsize=8)
             if col_idx == 0:
                 ax.set_ylabel("Predicted", fontsize=8)
                 ax.annotate(
@@ -2482,14 +2482,14 @@ def main():
         (Supporting Information 12). Aliquots are then pooled by summing reads,
         which weights the pooled proportion by sequencing depth.
 
-    Step 3 — ddPCR data processing (Supporting Information 13):
-        Digital droplet PCR gives absolute mtDNA copy numbers per insect taxon
+    Step 3 — dPCR data processing (Supporting Information 13):
+        Digital PCR (dPCR) gives absolute mtDNA copy numbers per insect taxon
         (Supporting Information 8). The two replicates are checked for consistency
         (Wilcoxon test, Supporting Information 13) and then averaged to obtain one
         copy number per (sample, order).
 
     Step 4 — Merge all measurements:
-        Metabarcoding reads, ddPCR copy numbers, and known biomass proportions
+        Metabarcoding reads, dPCR copy numbers, and known biomass proportions
         (Supporting Information 1) are joined into one unified table. This
         combined table (Supporting Information 14) is the basis for all downstream
         analyses.
@@ -2565,13 +2565,13 @@ def main():
     )  # community compositions + biomass
     supporting_information_4 = (
         SI_DIR / "supporting information 4.xlsx"
-    )  # ddPCR primer/probe sequences
+    )  # dPCR primer/probe sequences
     supporting_information_5 = (
         SI_DIR / "supporting information 5.xlsx"
     )  # qPCR validation data
     supporting_information_8 = (
         SI_DIR / "supporting information 8.xlsx"
-    )  # ddPCR raw copy numbers
+    )  # dPCR raw copy numbers
     supporting_information_11 = (
         SI_DIR / "supporting information 11.parquet.snappy"
     )  # metabarcoding raw reads
@@ -2594,12 +2594,12 @@ def main():
     )
     relative_read_data = absolute_reads_to_relative_reads(aggregated_read_data)
 
-    # --- Step 3: ddPCR data processing ---
-    ddpcr_data = aggregate_ddpcr_data(supporting_information_8)
+    # --- Step 3: dPCR data processing ---
+    dpcr_data = aggregate_dpcr_data(supporting_information_8)
 
     # --- Step 4: Merge all data sources ---
     full_results = final_aggregation(
-        relative_read_data, ddpcr_data, supporting_information_1
+        relative_read_data, dpcr_data, supporting_information_1
     )
 
     # --- Step 5: Fold-change, rank concordance, and Figure 2 ---
