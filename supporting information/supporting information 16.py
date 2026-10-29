@@ -1836,10 +1836,17 @@ def supporting_information_9_1(supporting_information_10: Path) -> None:
     wells, thick lines: median per taxon). Panel B shows the PCR efficiency E per
     well (LinRegPCR) per taxon as box plot with single wells; E = 2 is a perfect
     doubling per cycle. Wells without an efficiency estimate (no-template
-    controls) are not shown. Input: Supporting Information 10.
+    controls) are not shown. Panel C shows the derivative of the melt curve of
+    every well (no-template controls in grey, dashed) to check that every
+    reaction contains a single product and no primer dimers. Input:
+    Supporting Information 10.
     """
     # --- Data loading ---
     cycles = [str(c) for c in range(1, 41)]
+    melt = pd.read_excel(supporting_information_10, sheet_name="Melt curves")
+    melt = melt.rename(
+        columns={"Derivative of melt fluorescence (instrument)": "derivative"}
+    )
     curves = pd.read_excel(supporting_information_10, sheet_name="Baseline-corrected")
     curves.columns = [str(c) for c in curves.columns]
     curves = curves[curves["Taxon"].isin(ORDER_NAMES)]
@@ -1849,9 +1856,11 @@ def supporting_information_9_1(supporting_information_10: Path) -> None:
 
     groups = [wells.loc[wells["Taxon"] == t, "E"].values for t in ORDER_NAMES]
 
-    fig, (ax_curves, ax_eff) = plt.subplots(
-        1, 2, figsize=(13, 5.2), gridspec_kw={"width_ratios": [1.15, 1]}
-    )
+    fig = plt.figure(figsize=(13, 9.2))
+    grid = fig.add_gridspec(2, 2, width_ratios=[1.15, 1], height_ratios=[1, 0.85])
+    ax_curves = fig.add_subplot(grid[0, 0])
+    ax_eff = fig.add_subplot(grid[0, 1])
+    ax_melt = fig.add_subplot(grid[1, :])
 
     # --- Panel A: amplification plot (log scale) ---
     x = np.arange(1, 41)
@@ -1922,8 +1931,43 @@ def supporting_information_9_1(supporting_information_10: Path) -> None:
         [f"{t}\n(n = {len(g)})" for t, g in zip(ORDER_NAMES, groups)]
     )
     ax_eff.set_title("B)", fontsize=12, loc="left")
+
+    # --- Panel C: melt curves (derivative of the melt fluorescence) ---
+    for (_, taxon), grp in melt.groupby(["Well", "Taxon"]):
+        if taxon in ORDER_NAMES:
+            ax_melt.plot(
+                grp["Temperature (°C)"],
+                grp["derivative"] / 1000,
+                color=ORDER_PALETTE[taxon],
+                lw=1,
+                alpha=0.6,
+            )
+        else:
+            ax_melt.plot(
+                grp["Temperature (°C)"],
+                grp["derivative"] / 1000,
+                color="0.4",
+                lw=1,
+                ls="--",
+                alpha=0.8,
+            )
+    ax_melt.set_xlim(60, 95)
+    ax_melt.set_xlabel("Temperature (°C)")
+    ax_melt.set_ylabel("Derivative of melt fluorescence (x 10³, instrument units)")
+    ax_melt.set_title("C)", fontsize=12, loc="left")
+    ax_melt.legend(
+        handles=[
+            plt.Line2D([0], [0], color=ORDER_PALETTE[t], lw=2, label=t)
+            for t in ORDER_NAMES
+        ]
+        + [plt.Line2D([0], [0], color="0.4", lw=1.5, ls="--", label="No-template control")],
+        frameon=False,
+        loc="upper left",
+        fontsize=9,
+    )
     sns.despine(ax=ax_curves)
     sns.despine(ax=ax_eff)
+    sns.despine(ax=ax_melt)
 
     plt.tight_layout()
     plt.savefig(SI_DIR / "supporting information 9_1.pdf")
