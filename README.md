@@ -58,7 +58,7 @@ Located in [`supporting information/`](supporting%20information/):
 | `supporting information 3.fasta` | Sanger consensus sequences of the single specimens (primer binding sites of the fwh2 primers) |
 | `supporting information 5.xlsx` | qPCR primer validation results |
 | `supporting information 8.xlsx` | dPCR raw mtDNA copy number measurements |
-| `supporting information 10.xlsx` | qPCR raw data and per-well efficiencies of the second-step PCR |
+| `supporting information 10.xlsx` | qPCR raw data, per-well efficiencies and melt curves of the second-step PCR |
 | `supporting information 11.parquet.snappy` | Raw metabarcoding read counts |
 | `supporting information 15.parquet.snappy` | Counts of the incorporated fwh2 primer variants per taxon, sample, aliquot and number of cycles |
 
@@ -86,7 +86,7 @@ All other supporting information files (e.g. SI 2, 7, 9, 22, 23) were prepared i
 4. **Data merge** — combines reads, copy numbers, and biomass into one master table (SI 14)
 5. **Fold-change / rank concordance** — agreement between the three measurement types (Figure 2, Table 1, SI 17–20)
 6. **Bias model comparison** — no correction vs. cycle calibration (Shelton et al. 2023) vs. cycle-dependent vs. constant bias correction (Figures 3–4, Table 2, SI 21, 24–28)
-7. **Second-step PCR** — efficiency of the second-step PCR per taxon from the qPCR raw data (SI 9_1, 9_2)
+7. **Second-step PCR** — efficiency of the second-step PCR per taxon and melt curves of the qPCR products from the qPCR raw data (SI 9_1, 9_2)
 8. **In silico primer analysis** — alignment and mismatch table of the primer variants (SI 29, 30), histograms of the incorporated primer variants (SI 31, Figure 5) and GC content of the amplicons (SI 32)
 
 See the docstrings in the script itself for full methodological detail on each step.
